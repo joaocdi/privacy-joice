@@ -1,0 +1,445 @@
+require('dotenv').config({ path: require('path').join(__dirname, '.env') });
+const path = require('path');
+const express = require('express');
+const cors = require('cors');
+
+const products = require('./products');
+const vipContent = require('./vip-content');
+const vipMedia = require('./services/vip-media');
+const { initDb, getDb } = require('./db/database');
+const paymentProvider = require('./payments/provider');
+const { createOrder, getOrderByPublicId, updateOrderPayment, updateOrderStatus } = require('./services/orders');
+const { confirmPayment, getExpiredEntitlements, expireEntitlement } = require('./services/entitlements');
+const { generateAccessToken } = require('./services/access-tokens');
+const { initBot, getBot, stopBot } = require('./telegram/bot');
+const { kickUser } = require('./telegram/invites');
+
+const app = express();
+const PORT = process.env.PORT || 3333;
+const { hash, matches } = require('./services/security');
+
+// Middlewares
+// CORS restrito à origem do frontend quando FRONTEND_URL estiver definido.
+// Sem isso qualquer site conseguia disparar pedidos no seu backend.
+const allowedOrigins = (process.env.FRONTEND_URL || '')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+app.use(cors((req, done) => done(null, {
+  origin(origin, callback) {
+    // Requisições sem Origin (curl, Postman, o próprio servidor estático) passam.
+    if (!origin) return callback(null, true);
+    try { if (new URL(origin).host === req.get('host')) return callback(null, true); } catch (_) {}
+    if (allowedOrigins.length === 0 && process.env.NODE_ENV !== 'production') return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error(`Origem não permitida: ${origin}`));
+  }
+})));
+
+app.use(express.json({ limit: '100kb' }));
+
+/**
+ * Rate limit simples em memória (sem dependência extra).
+ * Evita que alguém crie milhares de pedidos em segundos.
+ */
+function rateLimit({ windowMs, max }) {
+  const hits = new Map();
+
+  // Poda as chaves expiradas para o Map não crescer indefinidamente.
+  setInterval(() => {
+    const now = Date.now();
+    for (const [key, entry] of hits) {
+      if (now > entry.resetAt) hits.delete(key);
+    }
+  }, windowMs).unref();
+
+  return (req, res, next) => {
+    const key = req.ip;
+    const now = Date.now();
+    const entry = hits.get(key);
+
+    if (!entry || now > entry.resetAt) {
+      hits.set(key, { count: 1, resetAt: now + windowMs });
+      return next();
+    }
+
+    entry.count += 1;
+    if (entry.count > max) {
+      return res.status(429).json({ error: 'Muitas requisições. Aguarde um instante.' });
+    }
+
+    return next();
+  };
+}
+
+const pixRateLimit = rateLimit({ windowMs: 60 * 1000, max: 10 });
+const accessRateLimit = rateLimit({ windowMs: 60 * 1000, max: 20 });
+
+// Serve frontend optionally
+// Explicit public allowlist: never expose backend, database, archives or private media.
+const publicFiles = ['index.html', 'app.js', 'style.css', 'avatar.jpg', 'cover.jpg', 'verified.png',
+  'vip.html', 'vip.css', 'vip.js'];
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, '..', 'index.html')));
+// A página VIP é pública como ARQUIVO; o conteúdo dela não. Sem assinatura
+// ativa ela não recebe feed nem mídia — só a tela de acesso negado/expirado.
+app.get('/vip', (req, res) => res.sendFile(path.join(__dirname, '..', 'vip.html')));
+for (const file of publicFiles) app.get('/' + file, (req, res) => res.sendFile(path.join(__dirname, '..', file)));
+app.use('/api', (req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
+app.get('/api/catalog', (req, res) => res.json({ requiresClient: paymentProvider.requiresClient, mock: paymentProvider.name === 'mock', products: Object.values(products).filter(p => p.enabled !== false).map(p => ({ id: p.id, name: p.name, price: p.price })) }));
+function bearer(req) { return /^Bearer ([a-f0-9]{64})$/.exec(req.get('authorization') || '')?.[1]; }
+function owns(req, order) { return order && matches(bearer(req), order.checkout_hash); }
+async function authorizeOrder(req, res, next) {
+  try {
+    const order = await getOrderByPublicId(req.params.orderId);
+    if (!owns(req, order)) return res.status(403).json({ error: 'Acesso negado.' });
+    req.order = order; next();
+  } catch (error) { next(error); }
+}
+/**
+ * Monta o feed para UM pedido. Cada mídia vira um link assinado só dele.
+ * Post cujo arquivo ainda não existe fica de fora — as vagas em vip-content.js
+ * podem ser preenchidas aos poucos sem quebrar a página.
+ */
+function buildVipFeed(orderPublicId) {
+  return vipContent.posts
+    .filter((post) => post.type === 'cta' || (!post.draft && vipMedia.exists(post.source)))
+    .map((post) => (post.type === 'cta'
+      ? { id: post.id, type: 'cta', variant: post.variant, title: post.title, text: post.text, button: post.button }
+      : {
+        id: post.id,
+        type: post.type,
+        caption: post.caption || '',
+        likes: post.likes || 0,
+        comments: post.comments || 0,
+        media: `/api/vip/media/${vipMedia.signLink(orderPublicId, post.id)}`
+      }));
+}
+
+async function activeAccess(order) {
+  if (order.status !== 'PAID') return null;
+  return (await getDb()).get("SELECT * FROM entitlements WHERE order_id=? AND status='ACTIVE' AND (expires_at IS NULL OR expires_at>CURRENT_TIMESTAMP)", order.id);
+}
+/**
+ * GET /api/vip/:orderId
+ *
+ * Autorização e conteúdo da área VIP, na MESMA checagem que já existia:
+ * `authorizeOrder` prova a posse do pedido e `activeAccess` decide se há
+ * assinatura válida. O feed só é montado depois disso — o frontend nunca
+ * recebe caminho de mídia que ele não possa abrir.
+ *
+ * Distingue "expirado" de "negado" para a página poder oferecer renovação,
+ * sem duplicar a regra: lê o mesmo entitlement.
+ */
+app.get('/api/vip/:orderId', authorizeOrder, async (req, res, next) => {
+  try {
+    const entitlement = await activeAccess(req.order);
+    if (!entitlement || req.order.access_type !== 'vip') {
+      const previous = req.order.access_type === 'vip'
+        ? await (await getDb()).get('SELECT status, expires_at FROM entitlements WHERE order_id=?', req.order.id)
+        : null;
+      const expired = Boolean(previous) && req.order.status === 'PAID';
+      return res.status(403).json({ error: expired ? 'Seu acesso expirou.' : 'Acesso negado.', expired });
+    }
+
+    // Só o que a tela precisa. Nada de dados do comprador, hash ou token.
+    res.json({
+      granted: true,
+      productId: entitlement.product_id,
+      expiresAt: entitlement.expires_at,
+      profile: vipContent.profile,
+      feed: buildVipFeed(req.order.public_id)
+    });
+  } catch (error) { next(error); }
+});
+
+/**
+ * GET /api/vip/media/:token
+ *
+ * <img> e <video> não mandam header Authorization, então a autorização viaja
+ * num link assinado (curta duração, preso a um pedido e a um post). O link diz
+ * de quem é; quem decide continua sendo o banco, reconferido aqui.
+ */
+app.get('/api/vip/media/:token', async (req, res, next) => {
+  try {
+    const link = vipMedia.verifyLink(req.params.token);
+    if (!link) return res.status(403).json({ error: 'Link inválido ou expirado.' });
+
+    const order = await getOrderByPublicId(link.orderId);
+    if (!order || order.access_type !== 'vip' || !await activeAccess(order)) {
+      return res.status(403).json({ error: 'Acesso negado.' });
+    }
+
+    const post = vipContent.posts.find((item) => item.id === link.postId);
+    if (!post || post.type === 'cta' || !post.source) return res.status(404).json({ error: 'Conteúdo não encontrado.' });
+
+    return await vipMedia.deliver(req, res, post.source);
+  } catch (error) { next(error); }
+});
+
+// GET /api/health
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// POST /api/payments/pix
+app.post('/api/payments/pix', pixRateLimit, async (req, res) => {
+  let order;
+  try {
+    const { productId, checkoutToken, client } = req.body || {};
+    if (typeof productId !== 'string') return res.status(400).json({ error: 'productId obrigatório.' });
+    if (!Object.hasOwn(products, productId)) return res.status(404).json({ error: 'Produto não encontrado.' });
+    const product = products[productId];
+    if (product.enabled === false) return res.status(409).json({ error: 'Este produto ainda não está disponível.' });
+    if (typeof checkoutToken !== 'string' || !/^[a-f0-9]{64}$/.test(checkoutToken)) return res.status(400).json({ error: 'Token de checkout inválido.' });
+    if (paymentProvider.requiresClient && !paymentProvider.validateClient(client)) return res.status(400).json({ error: 'Preencha nome, e-mail, telefone e CPF/CNPJ.' });
+    if (paymentProvider.configuration) paymentProvider.configuration();
+    order = await createOrder(product, checkoutToken, paymentProvider.name, client);
+    if (order.fresh) {
+      const payment = await paymentProvider.createPixPayment({ orderId: order.public_id, product, client });
+      await updateOrderPayment(order.public_id, payment);
+      order = await getOrderByPublicId(order.public_id);
+    }
+    if (order.status === 'CREATING') return res.status(202).json({ orderId: order.public_id, status: order.status });
+    if (order.status === 'FAILED') return res.status(409).json({ error: 'Não foi possível confirmar a geração desta cobrança. Consulte o suporte antes de tentar outra.', orderId: order.public_id, status: order.status });
+    return res.status(order.fresh === false ? 200 : 201).json({
+      orderId: order.public_id, status: order.status, expiresAt: order.expires_at,
+      product: { id: order.product_id, name: product.name, price: order.amount },
+      pix: { copyPaste: order.pix_copy_paste, qrCode: order.pix_qr_code }, mock: paymentProvider.name === 'mock'
+    });
+  } catch (error) {
+    if (order?.fresh) await updateOrderStatus(order.public_id, 'FAILED').catch(() => {});
+    console.error('PIX creation failed:', error.name); // Never log provider responses, customer data or keys.
+    res.status(error.status || 502).json({ error: error.status ? error.message : 'Não foi possível gerar o PIX. Tente consultar este checkout novamente.' });
+  }
+});
+
+// GET /api/orders/:orderId/status
+app.get('/api/orders/:orderId/status', authorizeOrder, async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const order = await getOrderByPublicId(orderId);
+
+    if (!order) {
+      return res.status(404).json({ error: 'Pedido não encontrado.' });
+    }
+
+    // Polling only reads persisted state. Expiry is a visual hint, not approval.
+    const displayStatus = order.status === 'PENDING' && order.expires_at && Date.parse(order.expires_at.replace(' ', 'T') + 'Z') <= Date.now() ? 'EXPIRED' : order.status;
+    // Only update frontend state, does NOT decide if it's approved.
+    return res.json({
+      orderId: order.public_id,
+      status: displayStatus, expiresAt: order.expires_at
+    });
+  } catch (error) {
+    console.error('Erro ao consultar status:', error);
+    return res.status(500).json({ error: 'Erro ao consultar status do pagamento.' });
+  }
+});
+
+// POST /api/payments/webhook
+app.post('/api/payments/webhook', async (req, res) => {
+  try {
+    const payload = req.body;
+    if (typeof payload?.token !== 'string' || !payload.token || payload.token.length > 512) return res.status(401).json({ error: 'Webhook inválido.' });
+    const db = await getDb();
+    const order = await db.get('SELECT * FROM orders WHERE webhook_token_hash=? AND payment_provider=?', hash(payload.token), paymentProvider.name);
+    if (!order || !await paymentProvider.validateWebhook(payload, order)) return res.status(401).json({ error: 'Webhook inválido.' });
+    const parsed = paymentProvider.parseWebhook(payload);
+    if (parsed.providerPaymentId != null && String(parsed.providerPaymentId) !== order.provider_payment_id) return res.status(401).json({ error: 'Transação divergente.' });
+    if (parsed.event !== 'TRANSACTION_PAID') return res.json({ received: true, ignored: true });
+    await confirmPayment(order.public_id);
+    return res.json({ received: true, status: 'PAID' });
+  } catch (error) {
+    console.error('Webhook processing failed:', error.name);
+    return res.status(500).json({ error: 'Erro ao processar webhook.' });
+  }
+});
+
+/**
+ * GET /api/access/:orderId
+ * Emite o link do bot do Telegram para um pedido pago.
+ *
+ * Como só guardamos o HASH do token, não dá para reexibir um token antigo:
+ * geramos um novo e `generateAccessToken` invalida os anteriores não usados,
+ * de modo que só existe um link válido por pedido ao mesmo tempo.
+ *
+ * Proteções: rate limit por IP e recusa quando o acesso já foi resgatado por
+ * uma conta do Telegram (evita que alguém de posse do orderId gere um segundo
+ * link e roube o acesso do comprador).
+ */
+app.get('/api/access/:orderId', accessRateLimit, authorizeOrder, async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const order = await getOrderByPublicId(orderId);
+
+    if (!order || order.status !== 'PAID') {
+      return res.status(403).json({ error: 'Acesso negado.' });
+    }
+
+    const db = await getDb();
+    const entitlement = await db.get(
+      `SELECT * FROM entitlements WHERE order_id = ?`,
+      [order.id]
+    );
+
+    if (!entitlement) {
+      return res.status(409).json({ error: 'Acesso ainda não liberado. Tente novamente em instantes.' });
+    }
+
+    if (!await activeAccess(order) || order.access_type !== 'vip') {
+      return res.status(403).json({ error: 'Este acesso não está mais ativo.' });
+    }
+
+    if (entitlement.telegram_user_id) {
+      return res.status(409).json({
+        error: 'Este pedido já foi vinculado a uma conta do Telegram. Abra a conversa com o bot para reentrar.'
+      });
+    }
+
+    let botUsername = process.env.TELEGRAM_BOT_USERNAME;
+    const botConfigured = botUsername && botUsername !== 'YOUR_BOT_USERNAME_HERE';
+
+    if (!botConfigured) {
+      return res.status(503).json({ error: 'Pagamento confirmado. A entrega pelo Telegram ainda não foi configurada. Entre em contato com o suporte.' });
+    }
+
+    const rawToken = await generateAccessToken(order.id);
+
+    return res.json({ url: `https://t.me/${botUsername}?start=${rawToken}` });
+  } catch (error) {
+    console.error('Erro ao emitir acesso:', error);
+    return res.status(500).json({ error: 'Erro interno' });
+  }
+});
+
+// DEV ROUTE: Simular pagamento
+if (process.env.NODE_ENV !== 'production' && paymentProvider.name === 'mock') {
+  app.post('/api/dev/orders/:orderId/pay', authorizeOrder, async (req, res) => {
+    try {
+      const { orderId } = req.params;
+      const order = await getOrderByPublicId(orderId);
+      if (!order) return res.status(404).json({ error: 'Pedido não encontrado.' });
+      if (order.status === 'PAID') return res.status(400).json({ error: 'Já está pago.' });
+
+      await confirmPayment(order.public_id);
+      
+      return res.json({ success: true, message: 'Pagamento simulado.' });
+    } catch (error) {
+      return res.status(500).json({ error: 'Erro interno simulando pagamento.' });
+    }
+  });
+}
+
+// Expiração de acessos.
+async function runExpiration() {
+  const expired = await getExpiredEntitlements();
+  for (const ent of expired) {
+    await expireEntitlement(ent.id);
+    if (ent.telegram_user_id) {
+      const chatId = process.env.TELEGRAM_VIP_CHAT_ID;
+      const bot = getBot();
+      if (bot && chatId && chatId !== 'YOUR_CHAT_ID_HERE') {
+        await kickUser(bot, chatId, ent.telegram_user_id);
+      }
+    }
+  }
+  return expired.length;
+}
+
+function startExpirationRoutine() {
+  setInterval(() => {
+    runExpiration().catch((error) => console.error('Erro na rotina de expiração:', error.name));
+  }, 60 * 1000); // Roda a cada 1 minuto
+}
+
+/**
+ * Em serverless não existe processo vivo para o setInterval acima, então a
+ * mesma rotina precisa ser chamada de fora (Vercel Cron). O endpoint só existe
+ * quando CRON_SECRET está definida, e exige esse segredo.
+ */
+if (process.env.CRON_SECRET) {
+  app.get('/api/jobs/expire', async (req, res) => {
+    const provided = /^Bearer (.+)$/.exec(req.get('authorization') || '')?.[1] || req.get('x-cron-secret');
+    if (!provided || !matches(provided, hash(process.env.CRON_SECRET))) {
+      return res.status(401).json({ error: 'Não autorizado.' });
+    }
+    try {
+      return res.json({ expired: await runExpiration() });
+    } catch (error) {
+      console.error('Cron expiration failed:', error.name);
+      return res.status(500).json({ error: 'Erro na expiração.' });
+    }
+  });
+}
+
+// Tratador de erros (inclui a rejeição de origem pelo CORS)
+app.use((err, req, res, next) => {
+  if (err && /Origem não permitida/.test(err.message)) {
+    return res.status(403).json({ error: err.message });
+  }
+  console.error('Erro não tratado:', err);
+  return res.status(500).json({ error: 'Erro interno do servidor.' });
+});
+
+/**
+ * Inicialização única.
+ *
+ * Na Vercel não existe startServer(): cada invocação importa o app e chama
+ * ready(). Memoizado para não reabrir o banco a cada requisição.
+ */
+let initialization = null;
+function ready() {
+  if (!initialization) {
+    initialization = (async () => {
+      if (paymentProvider.configuration) paymentProvider.configuration();
+      console.log(`🖼️  Mídia VIP: driver ${vipMedia.assertConfigured()}.`);
+      await initDb();
+      console.log(`📦 Banco de dados inicializado (${require('./db/database').driver}).`);
+
+      // Vagas do feed ainda sem arquivo: aparecem aqui, não quebram a página.
+      const faltando = vipMedia.driverName() === 'local'
+        ? vipContent.posts
+          .filter((post) => post.type !== 'cta' && !post.draft && !vipMedia.exists(post.source))
+          .map((post) => post.source)
+        : [];
+      if (faltando.length) {
+        console.warn(`🖼️  ${faltando.length} mídia(s) do feed VIP ainda não existem e ficarão ocultas:`);
+        for (const source of faltando) console.warn(`     - ${source}`);
+      }
+    })().catch((error) => { initialization = null; throw error; });
+  }
+  return initialization;
+}
+
+// Inicialização
+async function startServer() {
+  await ready();
+
+  if (process.env.ENABLE_TELEGRAM_BOT === 'true') initBot();
+
+  startExpirationRoutine();
+
+  return app.listen(PORT, () => {
+    console.log(`🚀 Servidor rodando em http://localhost:${PORT}`);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`[DEV] Simular pagamento: POST http://localhost:${PORT}/api/dev/orders/:orderId/pay`);
+    }
+  });
+}
+
+// Encerramento limpo (para o long-polling do bot antes de sair)
+for (const signal of ['SIGINT', 'SIGTERM']) {
+  process.on(signal, () => {
+    console.log(`\nRecebido ${signal}, encerrando...`);
+    stopBot();
+    process.exit(0);
+  });
+}
+
+if (require.main === module) startServer().catch((error) => {
+  console.error('Falha ao iniciar o servidor:', error);
+  process.exit(1);
+});
+
+module.exports = { app, startServer, ready, runExpiration };

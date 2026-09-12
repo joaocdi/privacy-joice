@@ -1,0 +1,272 @@
+/* ==========================================================================
+   ÁREA VIP — feed de entrega.
+   Mesma linguagem visual da página de venda (Inter, laranja #f97316, cartões
+   claros), em arquivo separado para não encostar no style.css já aprovado.
+   Mobile first: 100% da largura no celular, coluna estreita centralizada no
+   desktop. Sem painel lateral, sem dashboard.
+   ========================================================================== */
+
+:root {
+  --vip-bg: #f2f2f2;
+  --vip-card: #ffffff;
+  --vip-ink: #111111;
+  --vip-muted: #666666;
+  --vip-line: #ebebeb;
+  --vip-accent: #f97316;
+  --vip-ok: #16a34a;
+}
+
+* { box-sizing: border-box; }
+
+/* `hidden` precisa vencer os `display` declarados abaixo — sem isto, as telas
+   de carregando e de acesso negado ficam visíveis junto com o feed. */
+[hidden] { display: none !important; }
+
+body {
+  margin: 0;
+  background: var(--vip-bg);
+  color: var(--vip-ink);
+  font-family: 'Inter', Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.vip-frame {
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  background: var(--vip-card);
+  min-height: 100vh;
+}
+
+@media (min-width: 520px) {
+  .vip-frame {
+    min-height: auto;
+    margin: 24px auto;
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, .05), 0 18px 40px -24px rgba(0, 0, 0, .35);
+  }
+}
+
+/* ------------------------------------------------------------- topo */
+
+.vip-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 13px 16px;
+  background: var(--vip-card);
+  border-bottom: 1px solid var(--vip-line);
+}
+
+.vip-logo { font-size: 19px; font-weight: 800; letter-spacing: -.5px; }
+.vip-logo span { color: var(--vip-accent); }
+
+.vip-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--vip-ok);
+  background: #f1faf4;
+  border: 1px solid #cdebd8;
+  border-radius: 999px;
+  padding: 4px 10px;
+  white-space: nowrap;
+}
+
+.vip-badge::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--vip-ok);
+}
+
+/* --------------------------------------------- estados (carregando/bloqueado) */
+
+.vip-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+  padding: 64px 26px;
+}
+
+.vip-state h1 { margin: 0; font-size: 19px; letter-spacing: -.2px; }
+.vip-state p { margin: 0; max-width: 300px; font-size: 13.5px; line-height: 1.55; color: var(--vip-muted); }
+
+.vip-lock {
+  width: 74px;
+  height: 74px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #f6f6f6;
+  color: #9a9a9a;
+}
+
+.vip-spinner {
+  width: 26px;
+  height: 26px;
+  border: 3px solid #eee;
+  border-top-color: var(--vip-accent);
+  border-radius: 50%;
+  animation: vip-spin .8s linear infinite;
+}
+
+@keyframes vip-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .vip-spinner { animation-duration: 2.4s; } }
+
+.vip-cta {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 12px 22px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--vip-accent);
+  color: #fff;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 800;
+  letter-spacing: .02em;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+/* ------------------------------------------------------------ perfil */
+
+.vip-cover { height: 132px; background: #ddd; }
+.vip-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.vip-profile { border-bottom: 1px solid var(--vip-line); padding-bottom: 14px; }
+
+.vip-identity {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 0 16px;
+  margin-top: -34px;
+}
+
+.vip-avatar {
+  width: 78px;
+  height: 78px;
+  border-radius: 50%;
+  border: 3px solid #fff;
+  object-fit: cover;
+  background: #ccc;
+  flex: 0 0 auto;
+}
+
+.vip-identity-text { padding-bottom: 4px; min-width: 0; }
+
+.vip-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -.3px;
+}
+
+.vip-verified { flex: 0 0 auto; }
+.vip-username { margin: 2px 0 0; font-size: 13px; color: var(--vip-muted); }
+.vip-bio { margin: 10px 16px 0; font-size: 13.5px; line-height: 1.5; }
+.vip-expiry { margin: 8px 16px 0; font-size: 12px; color: var(--vip-muted); }
+
+/* -------------------------------------------------------------- feed */
+
+.vip-feed { display: flex; flex-direction: column; }
+
+.vip-post { border-bottom: 8px solid var(--vip-bg); }
+
+.vip-post-head { display: flex; align-items: center; gap: 10px; padding: 12px 16px; }
+.vip-post-head img { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; }
+.vip-post-head b { display: flex; align-items: center; gap: 5px; font-size: 13.5px; }
+.vip-post-head small { display: block; color: var(--vip-muted); font-size: 11.5px; font-weight: 500; }
+
+.vip-caption { margin: 0; padding: 0 16px 10px; font-size: 13.5px; line-height: 1.45; }
+
+.vip-media {
+  position: relative;
+  background: #111;
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+}
+
+.vip-media img,
+.vip-media video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.vip-actions {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 11px 16px;
+  color: var(--vip-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.vip-action { display: inline-flex; align-items: center; gap: 6px; }
+.vip-action svg { flex: 0 0 auto; }
+.vip-action-save { margin-left: auto; }
+
+/* --------------------------------------------------- bloco de chamada */
+
+.vip-promo {
+  margin: 0;
+  padding: 22px 18px;
+  text-align: center;
+  background: linear-gradient(180deg, #fff7ef, #ffffff);
+  border-bottom: 8px solid var(--vip-bg);
+}
+
+.vip-promo h2 { margin: 0 0 6px; font-size: 15.5px; letter-spacing: -.2px; }
+.vip-promo p { margin: 0 0 14px; font-size: 13px; line-height: 1.5; color: var(--vip-muted); }
+
+/* ------------------------------------------------------------ rodapé */
+
+.vip-footer { padding: 22px 16px 30px; text-align: center; }
+.vip-footer p { margin: 0; font-size: 11.5px; color: #9a9a9a; }
+
+/* ------------------------------------------------------------- modal */
+
+.vip-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, .55);
+}
+
+.vip-modal-overlay[hidden] { display: none; }
+
+.vip-modal {
+  width: 100%;
+  max-width: 340px;
+  background: var(--vip-card);
+  border-radius: 14px;
+  padding: 22px 20px;
+  text-align: center;
+}
+
+.vip-modal h2 { margin: 0 0 8px; font-size: 17px; }
+.vip-modal p { margin: 0 0 16px; font-size: 13.5px; line-height: 1.5; color: var(--vip-muted); }
+
+:focus-visible { outline: 2px solid var(--vip-accent); outline-offset: 2px; }

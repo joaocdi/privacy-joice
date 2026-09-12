@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Privacy – Joice M</title>
+  <meta name="description" content="Assine o perfil de Ana Caroline e tenha acesso a 736 publicações e 1.120 mídias exclusivas." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ===== MOBILE WRAPPER ===== -->
+<div class="mobile-frame" id="mobileFrame">
+
+  <!-- ===== TOP BAR ===== -->
+  <header class="topbar">
+    <span class="logo-text">privacy<span class="logo-dot">.</span></span>
+    <button class="lang-btn" aria-label="Idioma" id="langBtn">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/>
+        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10A15.3 15.3 0 0 1 12 2z"/>
+      </svg>
+    </button>
+  </header>
+
+  <!-- ===== PROFILE HEADER ===== -->
+  <section class="profile-header" id="profileHeader">
+
+    <!-- Cover photo -->
+    <div class="cover-wrap">
+      <img src="./cover.jpg" alt="Foto de capa" class="cover-img" id="coverImg" />
+    </div>
+
+    <!-- Avatar + Stats row -->
+    <div class="avatar-row">
+      <div class="avatar-group">
+        <div class="avatar-wrap" id="avatarLive">
+          <img src="./avatar.jpg" alt="Avatar" class="avatar-img" id="avatarImg" />
+        </div>
+        <button class="badge-live" id="badgeLive" aria-label="Assistir transmissão">
+          <span class="live-dot"></span> AO VIVO
+        </button>
+      </div>
+      <div class="stats-row">
+        <div class="stat-item">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          <span id="statPhotos">64</span>
+        </div>
+        <div class="stat-item">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+          <span id="statVideos">394</span>
+        </div>
+        <div class="stat-item">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#e44" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+          <span id="statLikes">1.5K</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Profile info -->
+    <div class="profile-info">
+      <div class="name-row">
+        <h1 class="profile-name" id="profileName">Joice M</h1>
+        <span class="verified-badge" aria-label="Verificado">
+          <svg width="18" height="18" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg"><polygon fill="#0095F6" points="29.62,3 33.05,8.31 39.37,8.62 39.69,14.94 45,18.37 42.12,24 45,29.63 39.69,33.06 39.37,39.38 33.05,39.69 29.62,45 24,42.12 18.38,45 14.95,39.69 8.63,39.38 8.31,33.06 3,29.63 5.88,24 3,18.37 8.31,14.94 8.63,8.62 14.95,8.31"/><polyline fill="none" points="16,24 21,29 32,18" stroke="white" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+      </div>
+      <p class="profile-username" id="profileUsername">@_johhh.of</p>
+      <p class="profile-bio" id="profileBio">💋 Oi, eu sou a Joice. Aqui você vê o meu lado que eu não mostro em nenhum outro lugar 👀🔥 Conteúdo exclusivo, rotina e umas surpresas só p...</p>
+      <button class="read-more-btn" id="readMoreBtn">Ler mais</button>
+      <div class="social-links">
+        <a href="https://www.instagram.com/_johhh.of/" target="_blank" rel="noopener noreferrer" class="ig-btn" aria-label="Instagram" id="igBtn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="2" width="20" height="20" rx="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== SUBSCRIPTION PLANS ===== -->
+  <section class="sub-plans" id="subscriptionPlans">
+    <!-- Group 1: Assinaturas -->
+    <div class="plans-group">
+      <h2 class="plans-title">Assinaturas</h2>
+      <button class="btn-plan" id="btnPlan1m">
+        <span>1 mês</span>
+        <span class="plan-price">R$ 9,90</span>
+      </button>
+    </div>
+
+    <!-- Group 2: Promoções (Collapsible) -->
+    <div class="plans-group" style="margin-top: 12px;">
+      <div class="plans-header-toggle" id="promoToggle" role="button" tabindex="0">
+        <h2 class="plans-title" style="margin-bottom: 0;">Promoções</h2>
+        <svg class="chevron-icon" id="promoChevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="18 15 12 9 6 15"></polyline>
+        </svg>
+      </div>
+      <div class="promo-plans-content open" id="promoPlansContent">
+        <button class="btn-plan" id="btnPlan3m">
+          <span>3 meses (50% off)</span>
+          <span class="plan-price">R$ 19,90</span>
+        </button>
+        <button class="btn-plan" id="btnPlan6m">
+          <span>6 meses (50% off)</span>
+          <span class="plan-price">R$ 39,90</span>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== CONTENT TABS ===== -->
+  <section class="content-section" id="contentTabs">
+    <div class="tabs-bar">
+      <button class="tab-btn active" id="tab1">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+        <span id="tabPostsLabel">205 Postagens</span>
+      </button>
+      <button class="tab-btn" id="tab2">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        <span id="tabMediaLabel">458 Mídias</span>
+      </button>
+    </div>
+
+    <!-- POST 1 (Image) -->
+    <div class="post-header">
+      <img src="./avatar.jpg" alt="Avatar" class="post-avatar" />
+      <div class="post-info">
+        <div class="post-name-row">
+          <span class="post-name" class="dynamic-post-name">Joice M</span>
+          <svg width="14" height="14" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg"><polygon fill="#0095F6" points="29.62,3 33.05,8.31 39.37,8.62 39.69,14.94 45,18.37 42.12,24 45,29.63 39.69,33.06 39.37,39.38 33.05,39.69 29.62,45 24,42.12 18.38,45 14.95,39.69 8.63,39.38 8.31,33.06 3,29.63 5.88,24 3,18.37 8.31,14.94 8.63,8.62 14.95,8.31"/><polyline fill="none" points="16,24 21,29 32,18" stroke="white" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <span class="post-username" class="dynamic-post-username">@_johhh.of</span>
+      </div>
+      <button class="post-menu" aria-label="Menu"><span></span><span></span><span></span></button>
+    </div>
+    <div class="locked-post">
+      <img src="./0d43266a68de4f6398771f421cdc2ab6.jpeg" alt="Conteúdo bloqueado" class="locked-img" />
+      <div class="locked-overlay">
+        <div class="lock-icon">
+          <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+        </div>
+        <p class="locked-text">Assine para ver este conteúdo</p>
+        <button class="btn-orange btn-unlock">Assinar por R$ 9,90</button>
+      </div>
+    </div>
+
+    <!-- POST 3 (Video 1) -->
+    <div class="post-header" style="margin-top: 15px;">
+      <img src="./avatar.jpg" alt="Avatar" class="post-avatar" />
+      <div class="post-info">
+        <div class="post-name-row">
+          <span class="post-name" class="dynamic-post-name">Joice M</span>
+          <svg width="14" height="14" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg"><polygon fill="#0095F6" points="29.62,3 33.05,8.31 39.37,8.62 39.69,14.94 45,18.37 42.12,24 45,29.63 39.69,33.06 39.37,39.38 33.05,39.69 29.62,45 24,42.12 18.38,45 14.95,39.69 8.63,39.38 8.31,33.06 3,29.63 5.88,24 3,18.37 8.31,14.94 8.63,8.62 14.95,8.31"/><polyline fill="none" points="16,24 21,29 32,18" stroke="white" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <span class="post-username" class="dynamic-post-username">@_johhh.of</span>
+      </div>
+      <button class="post-menu" aria-label="Menu"><span></span><span></span><span></span></button>
+    </div>
+    <div class="locked-post">
+      <video src="./565802ff-60bd-482f-bb3f-7a7ca2a48dbc.mp4" class="locked-img" muted loop autoplay playsinline preload="metadata"></video>
+      <div class="locked-overlay">
+        <div class="lock-icon">
+          <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+        </div>
+        <p class="locked-text">Assine para ver este conteúdo</p>
+        <button class="btn-orange btn-unlock">Assinar por R$ 9,90</button>
+      </div>
+    </div>
+
+    <!-- POST 4 (Video 2) -->
+    <div class="post-header" style="margin-top: 15px;">
+      <img src="./avatar.jpg" alt="Avatar" class="post-avatar" />
+      <div class="post-info">
+        <div class="post-name-row">
+          <span class="post-name" class="dynamic-post-name">Joice M</span>
+          <svg width="14" height="14" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg"><polygon fill="#0095F6" points="29.62,3 33.05,8.31 39.37,8.62 39.69,14.94 45,18.37 42.12,24 45,29.63 39.69,33.06 39.37,39.38 33.05,39.69 29.62,45 24,42.12 18.38,45 14.95,39.69 8.63,39.38 8.31,33.06 3,29.63 5.88,24 3,18.37 8.31,14.94 8.63,8.62 14.95,8.31"/><polyline fill="none" points="16,24 21,29 32,18" stroke="white" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <span class="post-username" class="dynamic-post-username">@_johhh.of</span>
+      </div>
+      <button class="post-menu" aria-label="Menu"><span></span><span></span><span></span></button>
+    </div>
+    <div class="locked-post">
+      <video src="./6ef0d710-e591-4e27-8ca5-d06588b52907.mp4" class="locked-img" muted loop autoplay playsinline preload="metadata"></video>
+      <div class="locked-overlay">
+        <div class="lock-icon">
+          <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+        </div>
+        <p class="locked-text">Assine para ver este conteúdo</p>
+        <button class="btn-orange btn-unlock">Assinar por R$ 9,90</button>
+      </div>
+    </div>
+
+    <!-- POST 5 (Video 3) -->
+    <div class="post-header" style="margin-top: 15px;">
+      <img src="./avatar.jpg" alt="Avatar" class="post-avatar" />
+      <div class="post-info">
+        <div class="post-name-row">
+          <span class="post-name" class="dynamic-post-name">Joice M</span>
+          <svg width="14" height="14" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg"><polygon fill="#0095F6" points="29.62,3 33.05,8.31 39.37,8.62 39.69,14.94 45,18.37 42.12,24 45,29.63 39.69,33.06 39.37,39.38 33.05,39.69 29.62,45 24,42.12 18.38,45 14.95,39.69 8.63,39.38 8.31,33.06 3,29.63 5.88,24 3,18.37 8.31,14.94 8.63,8.62 14.95,8.31"/><polyline fill="none" points="16,24 21,29 32,18" stroke="white" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <span class="post-username" class="dynamic-post-username">@_johhh.of</span>
+      </div>
+      <button class="post-menu" aria-label="Menu"><span></span><span></span><span></span></button>
+    </div>
+    <div class="locked-post">
+      <video src="./a1a71c2a-69d3-4f82-95d1-406581ecdcdf (2).mp4" class="locked-img" muted loop autoplay playsinline preload="metadata"></video>
+      <div class="locked-overlay">
+        <div class="lock-icon">
+          <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+        </div>
+        <p class="locked-text">Assine para ver este conteúdo</p>
+        <button class="btn-orange btn-unlock">Assinar por R$ 9,90</button>
+      </div>
+    </div>
+
+    <!-- POST 6 (Video 4) -->
+    <div class="post-header" style="margin-top: 15px;">
+      <img src="./avatar.jpg" alt="Avatar" class="post-avatar" />
+      <div class="post-info">
+        <div class="post-name-row">
+          <span class="post-name" class="dynamic-post-name">Joice M</span>
+          <svg width="14" height="14" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg"><polygon fill="#0095F6" points="29.62,3 33.05,8.31 39.37,8.62 39.69,14.94 45,18.37 42.12,24 45,29.63 39.69,33.06 39.37,39.38 33.05,39.69 29.62,45 24,42.12 18.38,45 14.95,39.69 8.63,39.38 8.31,33.06 3,29.63 5.88,24 3,18.37 8.31,14.94 8.63,8.62 14.95,8.31"/><polyline fill="none" points="16,24 21,29 32,18" stroke="white" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <span class="post-username" class="dynamic-post-username">@_johhh.of</span>
+      </div>
+      <button class="post-menu" aria-label="Menu"><span></span><span></span><span></span></button>
+    </div>
+    <div class="locked-post">
+      <video src="./cd621ae2-b16a-4952-9fbc-65642a737736.mp4" class="locked-img" muted loop autoplay playsinline preload="metadata"></video>
+      <div class="locked-overlay">
+        <div class="lock-icon">
+          <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+        </div>
+        <p class="locked-text">Assine para ver este conteúdo</p>
+        <button class="btn-orange btn-unlock">Assinar por R$ 9,90</button>
+      </div>
+    </div>
+
+    <!-- POST 7 (Video 5) -->
+    <div class="post-header" style="margin-top: 15px;">
+      <img src="./avatar.jpg" alt="Avatar" class="post-avatar" />
+      <div class="post-info">
+        <div class="post-name-row">
+          <span class="post-name" class="dynamic-post-name">Joice M</span>
+          <svg width="14" height="14" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg"><polygon fill="#0095F6" points="29.62,3 33.05,8.31 39.37,8.62 39.69,14.94 45,18.37 42.12,24 45,29.63 39.69,33.06 39.37,39.38 33.05,39.69 29.62,45 24,42.12 18.38,45 14.95,39.69 8.63,39.38 8.31,33.06 3,29.63 5.88,24 3,18.37 8.31,14.94 8.63,8.62 14.95,8.31"/><polyline fill="none" points="16,24 21,29 32,18" stroke="white" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <span class="post-username" class="dynamic-post-username">@_johhh.of</span>
+      </div>
+      <button class="post-menu" aria-label="Menu"><span></span><span></span><span></span></button>
+    </div>
+    <div class="locked-post">
+      <video src="./dba058a0-46d0-466e-97d4-a2d52d260a80.mp4" class="locked-img" muted loop autoplay playsinline preload="metadata"></video>
+      <div class="locked-overlay">
+        <div class="lock-icon">
+          <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+        </div>
+        <p class="locked-text">Assine para ver este conteúdo</p>
+        <button class="btn-orange btn-unlock">Assinar por R$ 9,90</button>
+      </div>
+    </div>
+
+    <!-- POST 8 (Video 6) -->
+    <div class="post-header" style="margin-top: 15px;">
+      <img src="./avatar.jpg" alt="Avatar" class="post-avatar" />
+      <div class="post-info">
+        <div class="post-name-row">
+          <span class="post-name" class="dynamic-post-name">Joice M</span>
+          <svg width="14" height="14" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg"><polygon fill="#0095F6" points="29.62,3 33.05,8.31 39.37,8.62 39.69,14.94 45,18.37 42.12,24 45,29.63 39.69,33.06 39.37,39.38 33.05,39.69 29.62,45 24,42.12 18.38,45 14.95,39.69 8.63,39.38 8.31,33.06 3,29.63 5.88,24 3,18.37 8.31,14.94 8.63,8.62 14.95,8.31"/><polyline fill="none" points="16,24 21,29 32,18" stroke="white" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <span class="post-username" class="dynamic-post-username">@_johhh.of</span>
+      </div>
+      <button class="post-menu" aria-label="Menu"><span></span><span></span><span></span></button>
+    </div>
+    <div class="locked-post" style="margin-bottom: 20px;">
+      <video src="./c24b810d-b0cd-4cfc-b815-8600bdb79f93.mp4" class="locked-img" muted loop autoplay playsinline preload="metadata"></video>
+      <div class="locked-overlay">
+        <div class="lock-icon">
+          <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+        </div>
+        <p class="locked-text">Assine para ver este conteúdo</p>
+        <button class="btn-orange btn-unlock">Assinar por R$ 9,90</button>
+      </div>
+    </div>
+  </section>
+
+</div><!-- end mobile-frame -->
+
+<!-- ===== FLOATING CHAT BUTTON ===== -->
+<button class="floating-chat-btn" id="floatingChatAvatar" aria-label="Chat com Joice M">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+  </svg>
+</button>
+
+
+
+<!-- ===== CHAT MODAL ===== -->
+<div class="modal-overlay" id="chatModalOverlay" role="dialog" aria-modal="true" aria-label="Chat com Joice M">
+  <div class="chat-modal">
+    <div class="chat-header">
+      <img src="./avatar.jpg" alt="Joice M" class="chat-avatar" />
+      <div class="chat-header-info">
+        <span class="chat-name" id="chatNameEl">Joice M</span>
+        <span class="chat-status"><span class="online-dot"></span> online agora</span>
+      </div>
+      <div class="chat-header-actions">
+        <button class="chat-video-btn" aria-label="Vídeo">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+        </button>
+        <button class="chat-close-btn" id="closeChatModal" aria-label="Fechar">✕</button>
+      </div>
+    </div>
+    <div class="chat-body" id="chatBody">
+      <div class="chat-bubble received">Vem falar comigo, meu bem 💋</div>
+    </div>
+    <div class="chat-input-row">
+      <input type="text" class="chat-input" id="chatInput" placeholder="Digite sua mensagem..." autocomplete="off" />
+      <button class="chat-send-btn" id="chatSendBtn" aria-label="Enviar">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      </button>
+    </div>
+    
+    <!-- UNLOCK OVERLAY (shown after reply) -->
+    <div class="chat-unlock-overlay" id="chatUnlockOverlay" style="display:none;">
+      <div class="chat-unlock-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      </div>
+      <h3 class="chat-unlock-title">Desbloqueie o chat com Joice 🔓</h3>
+      <p class="chat-unlock-desc">Para continuar a conversa e liberar o acesso ao contato da Joice, é necessário realizar um pagamento único de <strong>R$ 7,00</strong>.</p>
+      <button class="btn-orange btn-chat-unlock" id="btnChatUnlock">🔓 DESBLOQUEAR POR R$ 7,00</button>
+      <button class="chat-unlock-skip" id="btnChatUnlockSkip">Agora não</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== CHECKOUT MODAL ===== -->
+<div class="modal-overlay" id="checkoutModalOverlay" role="dialog" aria-modal="true" aria-label="Checkout">
+  <div class="checkout-modal">
+    <div class="checkout-header">
+      <span class="checkout-title">Finalizar assinatura</span>
+      <button class="checkout-close" id="closeCheckoutModal" aria-label="Fechar">✕</button>
+    </div>
+    <div class="checkout-body">
+      <div class="checkout-avatar-row">
+        <img src="./avatar.jpg" alt="Joice M" class="checkout-avatar" />
+        <div>
+          <p class="checkout-creator-name" id="checkoutCreatorName">Joice M</p>
+          <p class="checkout-creator-user" id="checkoutCreatorUser">@_johhh.of</p>
+        </div>
+      </div>
+
+      <div class="checkout-plan-info" id="checkoutPlanInfo">
+        <span class="checkout-plan-label" id="checkoutPlanLabel">1 mês</span>
+        <span class="checkout-plan-price" id="checkoutPlanPrice">R$ 9,90</span>
+      </div>
+
+      <form id="checkoutClientForm" class="checkout-client-form" style="display:none;">
+        <label>Nome completo<input name="name" autocomplete="name" minlength="3" maxlength="150" required /></label>
+        <label>E-mail<input name="email" type="email" autocomplete="email" maxlength="254" required /></label>
+        <label>Telefone<input name="phone" type="tel" autocomplete="tel" minlength="10" maxlength="25" required /></label>
+        <label>CPF ou CNPJ<input name="document" inputmode="numeric" minlength="11" maxlength="18" required /></label>
+        <button type="submit" class="btn-orange btn-pix">GERAR PIX</button>
+      </form>
+      <!-- Loading State -->
+      <div id="pixLoadingState" class="pix-loading-box" style="display: none;">
+        <div class="pix-spinner"></div>
+        <span class="pix-loading-text">Gerando QR Code PIX...</span>
+      </div>
+
+      <!-- Active PIX Area -->
+      <div id="pixActiveArea" style="display:none;">
+        <p id="pixMockNotice" class="checkout-note" hidden>SIMULAÇÃO: este código não realiza um pagamento.</p>
+        <div class="pix-qr-container">
+          <img id="pixQrImage" src="" alt="QR Code PIX" class="pix-qr-image" />
+        </div>
+
+        <div class="pix-copypaste-container">
+          <label class="pix-copypaste-title">PIX copia e cola</label>
+          <div class="pix-copypaste-input-wrap">
+            <input type="text" id="pixCodeInput" class="pix-copypaste-field" readonly />
+            <button type="button" class="pix-btn-copy" id="btnCopyPix">COPIAR</button>
+          </div>
+        </div>
+
+        <div class="pix-status-container" id="pixStatusContainer">
+          <span class="pix-status-indicator"></span>
+          <span class="pix-status-message" id="pixStatusMessage" role="status" aria-live="polite">Aguardando pagamento...</span>
+        </div>
+
+        <!-- Confirmado -->
+        <div id="pixSuccessNotification" class="pix-success-wrapper" style="display: none;">
+          <p class="pix-success-headline">Pagamento confirmado ✅</p>
+          <button type="button" class="btn-orange pix-btn-access" id="btnAccessNow">ACESSAR MEU CONTEÚDO</button>
+        </div>
+      </div>
+
+      <p class="checkout-note" style="margin-top: 10px;">Pagamento 100% seguro e instantâneo via PIX</p>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

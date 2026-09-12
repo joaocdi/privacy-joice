@@ -1,0 +1,27 @@
+node_modules/
+.DS_Store
+.vscode/
+.idea/
+.env
+.env.*
+!.env.example
+*.log
+
+*.sqlite
+*.sqlite-*
+backend/.test-runs/
+
+# Conteúdo privado/local e arquivos de trabalho não fazem parte do deploy.
+Area_membro/
+Midias_Bloqueadas/
+Privacy_Sites.zip
+*.pem
+*.key
+*.p12
+*.pfx
+*.db
+*.db-*
+.vercel/
+clone.html
+site_source.html
+routes_bundle.js

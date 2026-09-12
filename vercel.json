@@ -1,0 +1,15 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "api/index.js": {
+      "maxDuration": 30,
+      "includeFiles": "{index.html,app.js,style.css,vip.html,vip.css,vip.js,avatar.jpg,cover.jpg,verified.png,backend/**}"
+    }
+  },
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/api/index" }
+  ],
+  "crons": [
+    { "path": "/api/jobs/expire", "schedule": "0 * * * *" }
+  ]
+}
