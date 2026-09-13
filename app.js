@@ -76,7 +76,145 @@ const HOME_CAPTIONS = [
   'Sem pressa. Sem filtro. Mais perto.',
   'O próximo capítulo te espera.'
 ];
-function decorateLockedPost(post, { type, caption, id }) {
+/**
+ * TEASER DE VÍDEO BLOQUEADO.
+ *
+ * O que toca aqui NÃO é o vídeo da área VIP. É um arquivo derivado servido por
+ * `/api/home/preview-video/<id>`: poucos segundos, resolução baixa, sem faixa
+ * de áudio e com o desfoque já gravado dentro dele. O original nunca chega a
+ * este navegador — nem por link assinado, nem por caminho de Storage.
+ *
+ * O que esta função faz é só o comportamento de tela:
+ *   toca sem som → congela no limite → mostra o convite para assinar.
+ *
+ * `preload="metadata"` de propósito: no celular, nada de baixar o arquivo
+ * inteiro antes da pessoa olhar para ele.
+ */
+function mountTeaser(locked, { src, seconds, poster, overlay }) {
+  const limit = Number(seconds) > 0 ? Number(seconds) : 3;
+  // O convite do teaser fala do vídeo, não de "este conteúdo" genérico.
+  if (overlay) {
+    const title = overlay.querySelector('.locked-text');
+    if (title) {
+      title.textContent = 'Continue assistindo';
+      const note = document.createElement('span');
+      note.className = 'locked-subtext';
+      note.textContent = 'Assine para desbloquear o vídeo completo';
+      title.after(note);
+    }
+  }
+  const video = document.createElement('video');
+  video.className = 'locked-video';
+  video.src = src;
+  video.muted = true; video.defaultMuted = true; video.volume = 0;
+  video.playsInline = true;
+  video.setAttribute('muted', '');
+  video.setAttribute('playsinline', '');
+  video.setAttribute('webkit-playsinline', '');
+  video.preload = 'metadata';
+  video.loop = false;
+  video.controls = false;
+  video.disablePictureInPicture = true;
+  video.setAttribute('controlsList', 'nodownload noplaybackrate noremoteplayback');
+  if (poster) video.poster = poster;
+
+  const replay = document.createElement('button');
+  replay.type = 'button';
+  replay.className = 'locked-replay';
+  replay.hidden = true;
+
+  // Congelar é o ponto: o quadro parado continua na tela sob o convite.
+  let frozen = false;
+  const freeze = () => {
+    if (frozen) return;
+    frozen = true;
+    video.pause();
+    locked.classList.add('is-teaser-done');
+    replay.hidden = false;
+    replay.textContent = 'Ver de novo';
+  };
+  video.addEventListener('timeupdate', () => { if (video.currentTime >= limit) freeze(); });
+  video.addEventListener('ended', freeze);
+  // Nem arrastando a barra: não há barra, e qualquer salto além do limite volta.
+  video.addEventListener('seeking', () => { if (video.currentTime > limit) video.currentTime = limit; });
+
+  const play = () => {
+    frozen = false;
+    locked.classList.remove('is-teaser-done', 'is-teaser-paused');
+    replay.hidden = true;
+    video.currentTime = 0;
+    // Sempre o mesmo arquivo derivado: "ver de novo" não desbloqueia nada.
+    return video.play();
+  };
+  replay.addEventListener('click', event => { event.stopPropagation(); play(); });
+
+  // Autoplay bloqueado (iOS com economia de bateria, Data Saver) não pode virar
+  // um retângulo preto: fica o pôster desfocado e um botão de play.
+  video.addEventListener('loadedmetadata', () => {
+    video.play().catch(() => {
+      locked.classList.add('is-teaser-paused');
+      replay.hidden = false;
+      replay.textContent = '▶ Ver prévia';
+    });
+  }, { once: true });
+
+  // O vídeo entra ATRÁS do véu e do convite; o botão de rever, na frente.
+  if (overlay && overlay.parentNode === locked) locked.insertBefore(video, overlay);
+  else locked.append(video);
+  locked.append(replay);
+  return video;
+}
+
+/**
+ * Este item do carrossel pode aparecer para um visitante?
+ *
+ * Só se ele trouxer a PRÓPRIA derivada: a amostra minúscula embutida (foto) ou
+ * o endereço da rota de teaser (vídeo). Não existe caminho "senão mostra o
+ * original" — item sem derivada some da lista e pronto.
+ */
+function isSafePreviewItem(item) {
+  if (!item) return false;
+  const foto = typeof item.preview === 'string' && item.preview.startsWith('data:image/jpeg;base64,');
+  const video = typeof item.teaser === 'string' && item.teaser.startsWith('/api/home/preview-video/');
+  return foto || video;
+}
+
+/**
+ * O carrossel bloqueado da HOME.
+ *
+ * Reaproveita o cartão que já existe: a moldura, o véu, o cadeado e o CTA
+ * continuam exatamente onde estavam — o que muda é que agora há mais de uma
+ * derivada para deslizar por baixo deles.
+ */
+function mountLockedCarousel(locked, overlay, items, teaserSeconds) {
+  // O pôster e o teaser do primeiro item já foram montados por fora; o
+  // carrossel reconstrói tudo em células para poder deslizar.
+  locked.querySelectorAll('.locked-img, .locked-video, .locked-replay').forEach(node => node.remove());
+  locked.classList.remove('has-teaser');
+
+  JoiceCarousel.build(locked, items.map((item, index) => (cell) => {
+    cell.classList.add('locked-cell');
+    const image = document.createElement('img');
+    image.className = 'locked-img';
+    image.src = item.preview || '';
+    image.alt = item.type === 'video' ? 'Prévia desfocada de um vídeo exclusivo' : 'Prévia desfocada de uma foto exclusiva';
+    image.loading = index === 0 ? 'eager' : 'lazy';
+    image.width = 64; image.height = 80;
+    cell.append(image);
+    JoiceFrame.apply(image, item.crop, { box: cell });
+    if (item.type === 'video' && typeof item.teaser === 'string' && item.teaser.startsWith('/api/home/preview-video/')) {
+      cell.classList.add('has-teaser');
+      const video = mountTeaser(cell, { src: API_BASE + item.teaser, seconds: teaserSeconds, poster: item.preview, overlay: null });
+      JoiceFrame.apply(video, item.crop, { box: cell });
+    }
+  }), {
+    onEnter: video => { video.play?.().catch(() => {}); }
+  });
+  // O véu e o CTA ficam por cima de todos os slides, não dentro de um deles.
+  locked.append(overlay);
+}
+
+function decorateLockedPost(post, { type, caption, id, likes_count }) {
   const head = post.previousElementSibling;
   const article = document.createElement('article');
   article.className = 'preview-post';
@@ -92,7 +230,9 @@ function decorateLockedPost(post, { type, caption, id }) {
   article.append(captionEl, post);
   const footer = document.createElement('div');
   footer.className = 'preview-engagement';
-  const left = document.createElement('span'); left.textContent = 'Conteúdo exclusivo';
+  const left = document.createElement('span');
+  left.textContent = Number.isFinite(likes_count) ? '♡ ' + likes_count.toLocaleString('pt-BR') : 'Conteúdo exclusivo';
+  if (Number.isFinite(likes_count)) left.setAttribute('aria-label', likes_count + ' curtidas');
   const note = document.createElement('span'); note.textContent = 'Só para assinantes';
   footer.append(left, note); article.append(footer);
   return article;
@@ -188,10 +328,13 @@ async function openCheckout(productId) {
     if (!product) { checkoutError('Este produto ainda não está disponível para compra.'); return; }
     document.getElementById('checkoutPlanLabel').textContent = product.name;
     document.getElementById('checkoutPlanPrice').textContent = product.price.toLocaleString('pt-BR', {style:'currency',currency:'BRL'});
-    if (data.requiresClient) {
-      document.getElementById('pixLoadingState').style.display = 'none';
-      document.getElementById('checkoutClientForm').style.display = 'grid';
-    } else await createCheckoutPix(version);
+    const form=document.getElementById('checkoutClientForm');
+    form.querySelectorAll('[data-gateway-field]').forEach(label=>{label.hidden=!data.requiresClient;label.querySelector('input').disabled=!data.requiresClient;});
+    let pending;try{pending=JSON.parse(localStorage.getItem('joice.buyer.pending'));}catch(_){}
+    if(pending?.productId===selectedProduct && /^[a-f0-9]{64}$/.test(pending.token||'') && pending.payment?.orderId){
+      currentCheckoutToken=pending.token;showBuyerPix(pending.payment,version,pending.token);return;
+    }
+    document.getElementById('pixLoadingState').style.display = 'none'; form.style.display = 'grid';
   } catch (error) {
     if (version === checkoutVersion) checkoutError(error.message, () => openCheckout(productId));
   }
@@ -202,7 +345,7 @@ async function createCheckoutPix(version = checkoutVersion) {
   const productId = selectedProduct;
   const token = currentCheckoutToken;
   const form = document.getElementById('checkoutClientForm');
-  const client = catalog.requiresClient ? Object.fromEntries(new FormData(form)) : undefined;
+  const client = Object.fromEntries(new FormData(form));
   form.style.display = 'none'; checkoutError('Gerando QR Code PIX...');
   try {
     const response = await fetch(API_BASE + '/api/payments/pix', {
@@ -213,21 +356,23 @@ async function createCheckoutPix(version = checkoutVersion) {
     if (version !== checkoutVersion) return;
     if (response.status === 202) { checkoutError('Sua cobrança está sendo gerada. Aguarde alguns instantes.', () => createCheckoutPix(version)); return; }
     if (!response.ok) throw new Error(data.error || 'Não foi possível gerar o PIX.');
+    try{localStorage.setItem('joice.buyer.pending',JSON.stringify({productId,token,payment:data}));}catch(_){}
+    showBuyerPix(data,version,token);
+  } catch (error) {
+    if(version===checkoutVersion)checkoutError(error.message,()=>{document.getElementById('pixLoadingState').style.display='none';form.style.display='grid';});
+  } finally { if(version===checkoutVersion)checkoutBusy=false; }
+}
+function showBuyerPix(data,version,token){
+    document.getElementById('checkoutClientForm').style.display='none';
     currentOrderId = data.orderId;
     document.getElementById('pixCodeInput').value = data.pix.copyPaste;
     const qr = document.getElementById('pixQrImage'); qr.src = data.pix.qrCode; qr.style.display = 'block';
     document.getElementById('pixLoadingState').style.display = 'none';
     document.getElementById('pixActiveArea').style.display = 'block';
-    const copy = document.getElementById('btnCopyPix'); copy.disabled = false; copy.textContent = 'COPIAR'; copy.classList.remove('copied');
+    const copy = document.getElementById('btnCopyPix'); copy.disabled = false; copy.textContent = 'COPIAR CÓDIGO PIX'; copy.classList.remove('copied');
     document.getElementById('pixMockNotice').hidden = !data.mock;
     document.getElementById('pixStatusMessage').textContent = 'Aguardando pagamento...';
     startPaymentStatusPolling(data.orderId, version, token);
-  } catch (error) {
-    if (version === checkoutVersion) checkoutError(error.message, () => {
-      if (catalog.requiresClient) { document.getElementById('pixLoadingState').style.display='none'; form.style.display='grid'; }
-      else createCheckoutPix(version);
-    });
-  } finally { if (version === checkoutVersion) checkoutBusy = false; }
 }
 function startPaymentStatusPolling(orderId, version, token) {
   clearTimeout(currentPollingInterval);
@@ -239,7 +384,8 @@ function startPaymentStatusPolling(orderId, version, token) {
       const data = await response.json();
       if (version !== checkoutVersion) return;
       const message = document.getElementById('pixStatusMessage');
-      if (data.status === 'PAID') {
+      if (data.status === 'PAID' && data.granted === true) {
+        try { localStorage.setItem('joice.vip.access',JSON.stringify({orderId,token}));localStorage.removeItem('joice.buyer.pending'); } catch (_) {}
         document.getElementById('pixStatusContainer').classList.add('paid');
         message.textContent = 'Pagamento confirmado ✅';
         document.getElementById('pixSuccessNotification').style.display = 'block';
@@ -247,6 +393,7 @@ function startPaymentStatusPolling(orderId, version, token) {
         currentPollingInterval = null; return;
       }
       if (['EXPIRED','CANCELED','FAILED'].includes(data.status)) {
+        try { localStorage.removeItem('joice.buyer.pending');sessionStorage.removeItem('joice.checkout.'+selectedProduct); } catch (_) {}
         message.textContent = data.status === 'EXPIRED' ? 'Prazo encerrado. Se você pagou, reabra o checkout para consultar.' : 'Cobrança indisponível.';
         document.getElementById('btnCopyPix').disabled = true;
         currentPollingInterval = null; return;
@@ -382,10 +529,6 @@ function openWhatsapp() {
   showNotice('Em breve', 'O contato direto ainda não está disponível. Assim que abrir, você vê o aviso aqui mesmo na página.');
 }
 document.getElementById('btnChat')?.addEventListener('click', openWhatsapp);
-document.getElementById('btnMimo')?.addEventListener('click', () => showNotice(
-  'Mimo',
-  'O envio de mimo ainda não está aberto. Por enquanto, a melhor forma de chegar perto é a assinatura.'
-));
 (async function loadProfile() {
   try {
     const response = await fetch(API_BASE + '/api/profile', { signal: AbortSignal.timeout(8000) });
@@ -447,6 +590,18 @@ document.getElementById('btnMimo')?.addEventListener('click', () => showNotice(
     overlay.innerHTML = document.querySelector('.locked-overlay')?.innerHTML || '';
     locked.append(image, overlay);
     JoiceFrame.apply(image,item.crop,{box:locked});
+    // Vídeo com teaser derivado: o <video> entra por cima do pôster, que fica
+    // atrás como primeiro quadro e como plano B se o autoplay for bloqueado.
+    if (item.type === 'video' && typeof item.teaser === 'string' && item.teaser.startsWith('/api/home/preview-video/')) {
+      locked.classList.add('has-teaser');
+      const video = mountTeaser(locked, { src: API_BASE + item.teaser, seconds: item.teaserSeconds, poster: item.preview, overlay });
+      JoiceFrame.apply(video, item.crop, { box: locked });
+    }
+    // Carrossel bloqueado: só entram itens que trazem a SUA derivada segura —
+    // a amostra minúscula da foto ou a rota do teaser do vídeo. Item sem
+    // derivada simplesmente não vira slide; o original nunca é alternativa.
+    const safe = Array.isArray(item.items) ? item.items.filter(isSafePreviewItem) : [];
+    if (safe.length > 1) mountLockedCarousel(locked, overlay, safe, item.teaserSeconds);
     fragment.append(header, locked);
   });
   if (!fragment.childNodes.length) return;
@@ -456,7 +611,7 @@ document.getElementById('btnMimo')?.addEventListener('click', () => showNotice(
   document.querySelectorAll('.locked-post').forEach((post, index) => {
     const item = previews[index];
     decorateLockedPost(post, {
-      id: item.id,
+      id: item.id, likes_count: item.likes_count,
       type: item.type === 'video' ? 'video' : 'image',
       caption: item.caption || HOME_CAPTIONS[index % HOME_CAPTIONS.length]
     });
@@ -482,7 +637,7 @@ document.getElementById('btnCopyPix')?.addEventListener('click', async () => {
       btn.textContent = 'Copiado! ✓';
       btn.classList.add('copied');
       setTimeout(() => {
-        btn.textContent = 'COPIAR';
+        btn.textContent = 'COPIAR CÓDIGO PIX';
         btn.classList.remove('copied');
       }, 2500);
     }
@@ -598,3 +753,38 @@ document.addEventListener('keydown', event => {
   if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
   else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
 });
+// Buyer identity and recovery: never grants access without server verification.
+function maskBuyerPhone(input){
+ input.addEventListener('input',()=>{let d=input.value.replace(/\D/g,'').slice(0,11);input.value=d.length>7?'('+d.slice(0,2)+') '+d.slice(2,7)+'-'+d.slice(7):d.length>2?'('+d.slice(0,2)+') '+d.slice(2):d;});
+}
+document.querySelectorAll('#checkoutClientForm input[name="phone"], #buyerRecoveryPhone input').forEach(maskBuyerPhone);
+let buyerChallenge=null;
+function openBuyerRecovery(){
+ document.getElementById('buyerRecoveryCode').hidden=true;
+ document.getElementById('buyerRecoveryPhone').hidden=false;
+ document.getElementById('buyerRecoveryStatus').textContent='';buyerChallenge=null;openModal('buyerRecoveryModal');
+}
+document.getElementById('buyerRecoveryClose').onclick=()=>closeModal('buyerRecoveryModal');
+document.querySelectorAll('[data-buyer-access]').forEach(link=>link.addEventListener('click',event=>{
+ let access;try{access=JSON.parse(localStorage.getItem('joice.vip.access'));}catch(_){}
+ if(access?.orderId && /^[a-f0-9]{64}$/.test(access.token||''))return;
+ event.preventDefault();openBuyerRecovery();
+}));
+async function buyerRecoverySubmit(event,phase){
+ event.preventDefault();const form=event.currentTarget,button=form.querySelector('button'),status=document.getElementById('buyerRecoveryStatus');button.disabled=true;
+ try{
+  const values=Object.fromEntries(new FormData(form));
+  const response=await fetch(API_BASE+'/api/buyer/recovery/'+phase,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...values,challenge:buyerChallenge}),signal:AbortSignal.timeout(15000)});
+  const data=await response.json();if(!response.ok)throw new Error(data.error||'Tente novamente mais tarde.');
+  if(phase==='request'){
+   buyerChallenge=data.challenge;form.hidden=true;document.getElementById('buyerRecoveryCode').hidden=false;status.textContent=data.message;
+   document.querySelector('#buyerRecoveryCode input').focus();
+  }else{
+   localStorage.setItem('joice.vip.access',JSON.stringify({orderId:data.orderId,token:data.token}));location.assign('/vip');
+  }
+ }catch(error){status.textContent=error.message;}finally{button.disabled=false;}
+}
+document.getElementById('buyerRecoveryPhone').addEventListener('submit',event=>buyerRecoverySubmit(event,'request'));
+document.getElementById('buyerRecoveryCode').addEventListener('submit',event=>buyerRecoverySubmit(event,'verify'));
+if(new URLSearchParams(location.search).get('recover')==='1')openBuyerRecovery();
+else {try{const pending=JSON.parse(localStorage.getItem('joice.buyer.pending'));if(pending?.productId)openCheckout(pending.productId);}catch(_){}}

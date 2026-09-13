@@ -9,10 +9,12 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css?v=admin-2" />
-  <link rel="stylesheet" href="/admin-mode.css?v=admin-2" />
-<link rel="stylesheet" href="/frame.css?v=crop-1">
-<script src="/frame.js?v=crop-1" defer></script>
+  <link rel="stylesheet" href="style.css?v=carousel-1" />
+  <link rel="stylesheet" href="/admin-mode.css?v=carousel-1" />
+<link rel="stylesheet" href="/frame.css?v=carousel-1">
+<script src="/frame.js?v=carousel-1" defer></script>
+<link rel="stylesheet" href="/carousel.css?v=carousel-1">
+<script src="/carousel.js?v=carousel-1" defer></script>
 </head>
 <body>
 
@@ -23,7 +25,7 @@
   <header class="topbar">
     <a class="logo-text" href="/" aria-label="Joice, início">privacy</a>
     <span class="topbar-caption">UM LADO SÓ NOSSO</span>
-    <a class="member-link" href="/vip">Meu acesso <span aria-hidden="true">↗</span></a>
+    <a class="member-link" data-buyer-access href="/vip">Meu acesso <span aria-hidden="true">↗</span></a>
   </header>
 
   <!-- ===== CARTÃO DE PERFIL =====
@@ -85,12 +87,8 @@
       </div>
     </div>
 
-    <!-- Contato: mimo (informativo) e chat (abre o WhatsApp da Joice). -->
+    <!-- Contato da Joice. -->
     <div class="profile-actions">
-      <button type="button" class="profile-action" id="btnMimo">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M14.8 9.3a2.6 2.6 0 0 0-2.4-1.3c-1.4 0-2.4.8-2.4 1.9 0 2.5 5 1.4 5 4 0 1.2-1.1 2-2.6 2a2.7 2.7 0 0 1-2.5-1.4M12 6.2v1.8M12 16v1.8"/></svg>
-        <span>Mimo</span>
-      </button>
       <button type="button" class="profile-action" id="btnChat">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.9 8.9 0 0 1-3.8-.8L3 20.5l1.4-4.1A8.4 8.4 0 0 1 3 11.5a8.4 8.4 0 0 1 9-8.4 8.4 8.4 0 0 1 9 8.4z"/></svg>
         <span>Chat</span>
@@ -319,7 +317,7 @@
   </section>
 
   <!-- Rodapé enxuto: só o aviso legal e o atalho para quem já assinou. -->
-  <footer class="home-footer"><p>Conteúdo exclusivo para maiores de 18 anos.</p><a href="/vip">Já sou assinante ↗</a></footer>
+  <footer class="home-footer"><p>Conteúdo exclusivo para maiores de 18 anos.</p><a data-buyer-access href="/vip">Já assinou? Recuperar meu acesso</a></footer>
 </div><!-- end mobile-frame -->
 
 
@@ -358,10 +356,10 @@
       </div>
 
       <form id="checkoutClientForm" class="checkout-client-form" style="display:none;">
-        <label>Nome completo<input name="name" autocomplete="name" minlength="3" maxlength="150" required /></label>
-        <label>E-mail<input name="email" type="email" autocomplete="email" maxlength="254" required /></label>
-        <label>Telefone<input name="phone" type="tel" autocomplete="tel" minlength="10" maxlength="25" required /></label>
-        <label>CPF ou CNPJ<input name="document" inputmode="numeric" minlength="11" maxlength="18" required /></label>
+        <label data-gateway-field>Nome completo<input name="name" autocomplete="name" minlength="3" maxlength="150" required /></label>
+        <label data-gateway-field>E-mail<input name="email" type="email" autocomplete="email" maxlength="254" required /></label>
+        <label>Seu celular<input name="phone" type="tel" inputmode="numeric" autocomplete="tel" minlength="14" maxlength="15" placeholder="(__) _____-____" required /><small>Use este número para recuperar seu acesso.</small></label>
+        <label data-gateway-field>CPF ou CNPJ<input name="document" inputmode="numeric" minlength="11" maxlength="18" required /></label>
         <button type="submit" class="btn-orange btn-pix">GERAR PIX</button>
       </form>
       <!-- Loading State -->
@@ -373,7 +371,7 @@
       <!-- Active PIX Area -->
       <div id="pixActiveArea" style="display:none;">
         <p id="pixMockNotice" class="checkout-note" hidden>Modo de demonstração · este PIX não é pagável.</p>
-        <p class="pix-instruction">Escaneie com o app do seu banco<br><span>ou use o código abaixo.</span></p>
+        <p class="pix-instruction">Pague com Pix</p>
         <div class="pix-qr-container">
           <img id="pixQrImage" src="" alt="QR Code PIX" class="pix-qr-image" />
         </div>
@@ -382,10 +380,11 @@
           <label class="pix-copypaste-title">PIX copia e cola</label>
           <div class="pix-copypaste-input-wrap">
             <input type="text" id="pixCodeInput" class="pix-copypaste-field" readonly />
-            <button type="button" class="pix-btn-copy" id="btnCopyPix">COPIAR</button>
+            <button type="button" class="pix-btn-copy" id="btnCopyPix">COPIAR CÓDIGO PIX</button>
           </div>
         </div>
 
+        <ol class="buyer-pix-steps"><li>Toque em “Copiar código Pix”.</li><li>Abra o aplicativo do seu banco.</li><li>Escolha Pix → Copia e Cola.</li><li>Cole o código e confirme o pagamento.</li></ol><p class="checkout-note">Não precisa atualizar esta página.</p>
         <div class="pix-status-container" id="pixStatusContainer">
           <span class="pix-status-indicator"></span>
           <span class="pix-status-message" id="pixStatusMessage" role="status" aria-live="polite">Aguardando pagamento...</span>
@@ -393,8 +392,8 @@
 
         <!-- Confirmado -->
         <div id="pixSuccessNotification" class="pix-success-wrapper" style="display: none;">
-          <p class="pix-success-headline">Pagamento confirmado ✅</p>
-          <button type="button" class="btn-orange pix-btn-access" id="btnAccessNow">ACESSAR MEU CONTEÚDO</button>
+          <p class="pix-success-headline">Pagamento confirmado ✅</p><p>Seu acesso está liberado.</p>
+          <button type="button" class="btn-orange pix-btn-access" id="btnAccessNow">VER MEU CONTEÚDO</button>
         </div>
       </div>
 
@@ -403,7 +402,13 @@
   </div>
 </div>
 
-<script defer src="app.js?v=admin-2"></script>
-<script defer src="/admin-mode.js?v=admin-2" defer></script>
+<div class="modal-overlay" id="buyerRecoveryModal" role="dialog" aria-modal="true" aria-labelledby="buyerRecoveryTitle">
+ <div class="buyer-recovery-panel"><button type="button" id="buyerRecoveryClose" aria-label="Fechar">×</button>
+ <h2 id="buyerRecoveryTitle">Recuperar meu acesso</h2>
+ <form id="buyerRecoveryPhone"><label>Seu celular<input name="phone" type="tel" inputmode="numeric" autocomplete="tel" placeholder="(__) _____-____" maxlength="15" required /></label><button class="btn-orange" type="submit">ENVIAR CÓDIGO</button></form>
+ <form id="buyerRecoveryCode" hidden><label>Código de 6 dígitos<input name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required /></label><button class="btn-orange" type="submit">ENTRAR</button></form>
+ <p id="buyerRecoveryStatus" role="status" aria-live="polite"></p></div></div>
+<script defer src="app.js?v=carousel-1"></script>
+<script defer src="/admin-mode.js?v=carousel-1" defer></script>
 </body>
 </html>

@@ -72,10 +72,12 @@ function install(app) {
     res.json({ ok: true });
   }));
   api.get('/posts', wrap(async (req, res) => res.json({ posts: await posts.list(), source: await posts.source() })));
-  api.get('/posts/:id/media', wrap(async (req, res) => {
-    const post = await (await getDb()).get("SELECT * FROM vip_posts WHERE id=? AND creator_id='joice'", req.params.id);
-    if (!post || post.media_driver !== media.driverName()) throw posts.fail('Mídia indisponível neste ambiente.', 404);
-    await media.deliver(req, res, post.media_path);
+  // Com `mediaId`, entrega AQUELE item do carrossel; sem ele, a mídia que abre
+  // a publicação. Tudo aqui já está atrás da sessão administrativa.
+  api.get('/posts/:id/media/:mediaId?', wrap(async (req, res) => {
+    const item = await posts.findMediaItem(req.params.id, req.params.mediaId || null, { publishedOnly: false });
+    if (!item || !item.source || item.mediaDriver !== media.driverName()) throw posts.fail('Mídia indisponível neste ambiente.', 404);
+    await media.deliver(req, res, item.source);
   }));
   api.post('/posts', wrap(async (req, res) => res.status(201).json(await posts.save(null, req.body, req.admin.id))));
   api.put('/posts/:id', wrap(async (req, res) => res.json(await posts.save(req.params.id, req.body, req.admin.id))));

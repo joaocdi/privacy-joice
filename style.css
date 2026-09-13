@@ -1367,11 +1367,65 @@ body { background: #f7f7f7; }
 .preview-post:nth-of-type(3n+2) .locked-post,
 .preview-post:nth-of-type(3n) .locked-post { height: 360px; background: #f3f3f3; }
 .locked-img { filter: blur(6.6px) saturate(1.08); transform: scale(1.12); }
+
+/* ------------------------------------------------------- teaser de vídeo */
+/* O arquivo que toca aqui JÁ vem desfocado e em baixa resolução do servidor.
+   Nada nesta folha é proteção — é só o acabamento por cima da derivada. */
+.locked-post.has-teaser { background: #111; }
+.locked-video {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  display: block;
+  /* O pôster fica visível atrás enquanto o vídeo não começa. */
+  background: transparent;
+}
+/* Enquanto o teaser corre, o véu fica leve: a pessoa precisa ver o que perdeu.
+   Quando congela, o convite ganha a tela. */
+.has-teaser .locked-overlay { transition: background .25s ease, opacity .25s ease; }
+.has-teaser:not(.is-teaser-done):not(.is-teaser-paused) .locked-overlay {
+  background: linear-gradient(180deg, #0000000f, #00000024 55%, #00000047);
+}
+.has-teaser:not(.is-teaser-done):not(.is-teaser-paused) .lock-icon,
+.has-teaser:not(.is-teaser-done):not(.is-teaser-paused) .locked-text,
+.has-teaser:not(.is-teaser-done):not(.is-teaser-paused) .locked-subtext,
+.has-teaser:not(.is-teaser-done):not(.is-teaser-paused) .btn-unlock { opacity: 0; pointer-events: none; }
+.has-teaser.is-teaser-done .locked-overlay {
+  background: linear-gradient(180deg, #00000038, #00000059 45%, #0000007a);
+}
+.locked-subtext {
+  display: block;
+  max-width: 230px;
+  margin: -2px auto 2px;
+  font: 500 12px/1.45 Poppins, Arial, sans-serif;
+  color: #fff9efd6;
+  text-align: center;
+  text-shadow: 0 1px 6px #00000073;
+}
+/* Alvo de toque cheio, longe do botão de assinar para não errar o dedo. */
+.locked-replay {
+  position: absolute; z-index: 3;
+  right: 10px; bottom: 10px;
+  min-height: 44px; padding: 10px 16px;
+  border: 1px solid #ffffff5c; border-radius: 22px;
+  background: #00000080; color: #fff;
+  font: 600 12px Poppins, Arial, sans-serif;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+}
+.locked-replay:active { background: #000000a6; }
+@media (prefers-reduced-motion: reduce) {
+  .has-teaser .locked-overlay { transition: none; }
+}
 .locked-overlay {
   background: linear-gradient(180deg, #00000012, #0000001c 45%, #0000003d);
   gap: 11px;
   padding: 20px 18px;
 }
+/* O véu é irmão do trilho: não deve capturar o scroll nativo da mídia.
+   Só o CTA recupera cliques; sem restringir a rolagem vertical da página. */
+.locked-post.car-many > .locked-overlay { pointer-events: none; }
+.locked-post.car-many > .locked-overlay .btn-unlock { pointer-events: auto; }
 .lock-icon {
   width: 34px; height: 34px;
   background: #ffffff26;
@@ -1712,3 +1766,16 @@ body { background: #ecebe9; }
 .profile-card .cover-img{height:100%;object-fit:cover;object-position:50% 55%;background:#f3f3f3}
 .profile-name{font-weight:600;letter-spacing:0}
 .profile-bio{font-size:13px;line-height:1.4;color:#222}
+/* Checkout and buyer recovery only: readable controls and native mobile keyboard. */
+.checkout-client-form [hidden], #buyerRecoveryModal [hidden] { display:none !important; }
+.checkout-client-form input, .buyer-recovery-panel input { font-size:16px; min-height:46px; box-sizing:border-box; width:100%; }
+.checkout-client-form small { display:block; font-size:13px; font-weight:400; margin-top:5px; }
+.pix-copypaste-input-wrap { flex-wrap:wrap; }
+#btnCopyPix { width:100%; min-height:48px; font-size:16px; }
+.buyer-pix-steps { padding-left:22px; text-align:left; font-size:14px; line-height:1.6; }
+.buyer-recovery-panel { width:min(420px,calc(100vw - 32px)); box-sizing:border-box; background:white; padding:24px; border-radius:18px; max-height:90vh; overflow:auto; }
+.buyer-recovery-panel label { display:block; font-size:16px; }
+.buyer-recovery-panel input { margin:8px 0 16px; border:1px solid #ddd; border-radius:8px; padding:10px; }
+.buyer-recovery-panel button { min-height:44px; font-size:16px; }
+#buyerRecoveryClose { float:right; width:44px; border:0; background:white; }
+#buyerRecoveryStatus { font-size:14px; line-height:1.5; }

@@ -19,6 +19,8 @@ const { initBot, getBot, stopBot } = require('./telegram/bot');
 const { kickUser } = require('./telegram/invites');
 
 const app = express();
+const buyerRecovery = require('./services/buyer-recovery');
+const buyerPhone = require('./services/buyer-phone');
 const PORT = process.env.PORT || 3333;
 const { hash, matches } = require('./services/security');
 
@@ -88,7 +90,7 @@ const accessRateLimit = rateLimit({ windowMs: 60 * 1000, max: 20 });
 // existe sessão de admin é o backend, não estes arquivos.
 const publicFiles = ['index.html', 'app.js', 'style.css', 'avatar.jpg', 'cover.jpg', 'verified.png',
   'vip.html', 'vip.css', 'vip.js',
-  'login.html', 'login.css', 'login.js', 'admin-mode.css', 'admin-mode.js', 'frame.js', 'frame.css'];
+  'login.html', 'login.css', 'login.js', 'admin-mode.css', 'admin-mode.js', 'frame.js', 'frame.css', 'carousel.js', 'carousel.css'];
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, '..', 'index.html')));
 // A página VIP é pública como ARQUIVO; o conteúdo dela não. Sem assinatura
 // ativa ela não recebe feed nem mídia — só a tela de acesso negado/expirado.
@@ -116,6 +118,32 @@ app.get('/api/home/previews', async (req, res) => {
     console.error('Home previews failed:', error.name);
     res.json({ previews: [] });
   }
+});
+/**
+ * GET /api/home/preview-video/:postId
+ *
+ * O teaser de ~3s da HOME. Público como a amostra JPEG e pelo mesmo motivo:
+ * o que sai daqui é um arquivo DERIVADO — baixa resolução, sem áudio e com o
+ * desfoque gravado dentro dele —, guardado em `joice/previews/`.
+ *
+ * Três travas, e todas precisam passar:
+ *   1. a publicação tem de estar publicada, não arquivada e marcada como prévia;
+ *   2. o caminho lido tem de ser de teaser (`isPreviewPath`), então nem um
+ *      registro adulterado consegue apontar esta rota para `joice/posts/`;
+ *   3. `media_path` não é lido em lugar nenhum deste handler.
+ *
+ * Isto NÃO é uma porta para a área VIP: não aceita pedido, não aceita token, e
+ * o original continua exigindo entitlement ativo ou sessão de administrador.
+ */
+app.get('/api/home/preview-video/:postId/:mediaId?', async (req, res, next) => {
+  try {
+    // Com item, o teaser é o daquele item E ele tem de pertencer a este post.
+    const teaser = await vipPosts.homeTeaserPath(req.params.postId, req.params.mediaId || null);
+    if (!teaser) return res.sendStatus(404);
+    // O navegador pode guardar a derivada: ela é pública por natureza.
+    res.set('Cache-Control', 'public, max-age=300');
+    return await vipMedia.deliver(req, res, teaser);
+  } catch (error) { next(error); }
 });
 // Shared profile, including explicitly public branding images only.
 app.get('/api/profile', async (req, res, next) => {
@@ -150,11 +178,11 @@ app.get('/api/contact', (req, res) => {
 });
 app.get('/api/catalog', (req, res) => res.json({ requiresClient: paymentProvider.requiresClient, mock: paymentProvider.name === 'mock', products: Object.values(products).filter(p => p.enabled !== false).map(p => ({ id: p.id, name: p.name, price: p.price })) }));
 function bearer(req) { return /^Bearer ([a-f0-9]{64})$/.exec(req.get('authorization') || '')?.[1]; }
-function owns(req, order) { return order && matches(bearer(req), order.checkout_hash); }
+function owns(req, order) { return buyerRecovery.owns(order, bearer(req)); }
 async function authorizeOrder(req, res, next) {
   try {
     const order = await getOrderByPublicId(req.params.orderId);
-    if (!owns(req, order)) return res.status(403).json({ error: 'Acesso negado.' });
+    if (!await owns(req, order)) return res.status(403).json({ error: 'Acesso negado.' });
     req.order = order; next();
   } catch (error) { next(error); }
 }
@@ -177,8 +205,37 @@ async function buildVipFeed(orderPublicId, orderId) {
         realLikes: Boolean(post.realLikes),
         liked: Boolean(post.liked),
         comments: post.comments || 0,
-        media: `/api/vip/media/${vipMedia.signLink(orderPublicId, post.id)}`
+        media: `/api/vip/media/${vipMedia.signLink(orderPublicId, post.id)}`,
+        // Carrossel: um link assinado POR ITEM, cada um preso a este pedido e
+        // àquela mídia. Post de uma mídia devolve uma posição só, e a página
+        // desenha exatamente como antes.
+        items: carouselFor(post, ref => `/api/vip/media/${vipMedia.signLink(orderPublicId, ref)}`)
       }));
+}
+
+/**
+ * As mídias de um post prontas para a tela.
+ *
+ * Só entram itens cujo arquivo existe no Storage ativo — a mesma regra que o
+ * feed já usava para a mídia única, agora aplicada item a item, para uma vaga
+ * ainda sem arquivo não abrir um slide vazio no carrossel.
+ *
+ * `link(referencia)` monta o endereço; a referência carrega post e item, e é
+ * ela que vai assinada. O caminho do arquivo não sai daqui.
+ */
+function carouselFor(post, link) {
+  const items = Array.isArray(post.media) && post.media.length
+    ? post.media
+    : [{ id: null, type: post.type, source: post.source, mediaDriver: post.mediaDriver, crop: post.crop }];
+  return items
+    .filter(item => (!item.mediaDriver || item.mediaDriver === vipMedia.driverName()) && vipMedia.exists(item.source))
+    .map((item, index) => ({
+      id: item.id || post.id,
+      type: item.type,
+      crop: item.crop || null,
+      position: index,
+      media: link(item.id ? `${post.id}#${item.id}` : post.id)
+    }));
 }
 
 async function activeAccess(order) {
@@ -230,7 +287,11 @@ app.get('/api/vip/preview', requireAdmin, async (req, res, next) => {
           comments: post.comments || 0,
           // Sem link assinado: o cookie administrativo já viaja na requisição da
           // mídia, e ele não serve para mais ninguém.
-          media: `/api/vip/preview/media/${encodeURIComponent(post.id)}`
+          media: `/api/vip/preview/media/${encodeURIComponent(post.id)}`,
+          items: carouselFor(post, ref => {
+            const [postId, mediaId] = String(ref).split('#');
+            return '/api/vip/preview/media/' + encodeURIComponent(postId) + (mediaId ? '/' + encodeURIComponent(mediaId) : '');
+          })
         }));
     res.json({ granted: true, admin: true, productId: null, expiresAt: null, profile: await creatorProfile.get(), feed });
   } catch (error) { next(error); }
@@ -243,9 +304,9 @@ app.get('/api/vip/preview', requireAdmin, async (req, res, next) => {
  * cima e é reconferida aqui: a sessão precisa existir E o usuário precisa
  * continuar como admin no banco. Sem sessão, 403 — nada é entregue.
  */
-app.get('/api/vip/preview/media/:postId', requireAdmin, async (req, res, next) => {
+app.get('/api/vip/preview/media/:postId/:mediaId?', requireAdmin, async (req, res, next) => {
   try {
-    const post = await vipPosts.findForAdmin(req.params.postId);
+    const post = await vipPosts.findMediaItem(req.params.postId, req.params.mediaId || null, { publishedOnly: false });
     if (!post || post.type === 'cta' || !post.source || (post.mediaDriver && post.mediaDriver !== vipMedia.driverName())) {
       return res.status(404).json({ error: 'Conteúdo não encontrado.' });
     }
@@ -303,7 +364,10 @@ app.get('/api/vip/media/:token', async (req, res, next) => {
       return res.status(403).json({ error: 'Acesso negado.' });
     }
 
-    const post = await vipPosts.findPublished(link.postId);
+    // A referência assinada carrega "post#item" quando é carrossel. O item é
+    // reconferido no banco contra ESTE post: link de um não abre mídia do outro.
+    const [postId, mediaId] = String(link.postId).split('#');
+    const post = await vipPosts.findMediaItem(postId, mediaId, { publishedOnly: true });
     if (!post || post.type === 'cta' || !post.source || (post.mediaDriver && post.mediaDriver !== vipMedia.driverName())) return res.status(404).json({ error: 'Conteúdo não encontrado.' });
 
     return await vipMedia.deliver(req, res, post.source);
@@ -326,6 +390,16 @@ app.get('/api/health', (req, res) => {
 });
 
 // POST /api/payments/pix
+app.post('/api/buyer/recovery/request', async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  try { res.json(await buyerRecovery.request(req.body?.phone, req.ip)); }
+  catch (e) { res.status(e.status || 503).json({ error: e.status ? e.message : 'Recuperação indisponível.' }); }
+});
+app.post('/api/buyer/recovery/verify', async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  try { res.json(await buyerRecovery.verify(req.body?.challenge, req.body?.code, req.ip)); }
+  catch (e) { res.status(e.status || 503).json({ error: e.status ? e.message : 'Recuperação indisponível.' }); }
+});
 app.post('/api/payments/pix', pixRateLimit, async (req, res) => {
   let order;
   try {
@@ -336,8 +410,10 @@ app.post('/api/payments/pix', pixRateLimit, async (req, res) => {
     if (product.enabled === false) return res.status(409).json({ error: 'Este produto ainda não está disponível.' });
     if (typeof checkoutToken !== 'string' || !/^[a-f0-9]{64}$/.test(checkoutToken)) return res.status(400).json({ error: 'Token de checkout inválido.' });
     if (paymentProvider.requiresClient && !paymentProvider.validateClient(client)) return res.status(400).json({ error: 'Preencha nome, e-mail, telefone e CPF/CNPJ.' });
+    if (!paymentProvider.requiresClient && !buyerPhone(client?.phone)) return res.status(400).json({ error: 'Informe seu celular com DDD.' });
     if (paymentProvider.configuration) paymentProvider.configuration();
-    order = await createOrder(product, checkoutToken, paymentProvider.name, client);
+    const customer = paymentProvider.requiresClient ? client : { phone: buyerPhone(client.phone) };
+    order = await createOrder(product, checkoutToken, paymentProvider.name, customer);
     if (order.fresh) {
       const payment = await paymentProvider.createPixPayment({ orderId: order.public_id, product, client });
       await updateOrderPayment(order.public_id, payment);
@@ -372,7 +448,8 @@ app.get('/api/orders/:orderId/status', authorizeOrder, async (req, res) => {
     // Only update frontend state, does NOT decide if it's approved.
     return res.json({
       orderId: order.public_id,
-      status: displayStatus, expiresAt: order.expires_at
+      status: displayStatus, expiresAt: order.expires_at,
+      granted: Boolean(order.access_type === 'vip' && await activeAccess(order))
     });
   } catch (error) {
     console.error('Erro ao consultar status:', error);
@@ -545,6 +622,10 @@ function ready() {
       try {
         const adopted = await vipPosts.adoptLegacyOnce();
         if (adopted.switched) console.log(`📥 ${adopted.imported} publicação(ões) do feed antigo importadas para vip_posts.`);
+        // A adoção acontece depois do initDb, então a mídia dessas publicações
+        // vira item do carrossel aqui — e não só no próximo boot.
+        const itens = await require('./db/content-migrations').backfillMedia(await getDb());
+        if (itens) console.log(`🖼️  ${itens} mídia(s) viraram item do carrossel.`);
       } catch (error) {
         console.warn('📥 Importação do feed antigo não concluída:', error.message);
       }

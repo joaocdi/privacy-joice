@@ -40,7 +40,7 @@ async function main() {
   await child('test-suite.js', { TEST_BASE_URL: base });
   const db = await getDb();
   // Concurrent retries must produce one order and one provider call.
-  const body = { productId: 'quarterly', checkoutToken: token, price: 0.01, amount: 1 };
+  const body = { productId: 'quarterly', checkoutToken: token, client: {phone:'11999990000'}, price: 0.01, amount: 1 };
   const results = await Promise.all([request('/api/payments/pix', body), request('/api/payments/pix', body)]);
   assert.ok(results.every(r => [200,201,202].includes(r.status)));
   const order = await db.get('SELECT * FROM orders WHERE checkout_hash=?', hash(token));
@@ -136,8 +136,12 @@ async function main() {
   await child('tests/vip.js');
   await child('tests/vip-supabase.js');
   await child('tests/admin.js');
+  await child('tests/likes.js');
+  await child('tests/buyer-recovery.js');
   await child('tests/admin-mode.js');
   await child('tests/crop-delete.js');
+  await child('tests/preview-video.js');
+  await child('tests/carousel.js');
   await child('tests/content-postgres.js');
 }
 main().catch(error => { console.error(error); process.exitCode = 1; }).finally(async () => {

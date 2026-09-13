@@ -29,6 +29,8 @@ async function main() {
   assert.equal(dbService.driver, 'postgres');
   await dbService.initDb(); await dbService.initDb();
   const db = await dbService.getDb();
+  process.env.VIP_MEDIA_SECRET = crypto.randomBytes(32).toString('hex');
+  await require('./buyer-recovery')(db);
   await require('./profile-contract')(db);
   const now = Date.now();
   await db.run("INSERT INTO orders(public_id,product_id,amount) VALUES ('pg-cms-order','monthly',9.9)");
@@ -37,10 +39,19 @@ async function main() {
   let post = await posts.save(null, { caption: 'Postgres caption', sort_order: 20, published: true, uploadId: 'asset' }, 'session');
   await posts.setSource('managed');
   assert.equal((await posts.feed(order.id))[0].likes, 0);
+  assert.equal((await posts.feed(order.id))[0].liked, false, 'Postgres COUNT zero is not liked');
   await posts.like(post.id, order.id, true); await posts.like(post.id, order.id, true);
+  assert.equal((await posts.feed(order.id))[0].liked, true);
   assert.equal((await posts.feed(order.id))[0].likes, 1);
   await posts.like(post.id, order.id, false);
   assert.equal((await posts.feed(order.id))[0].likes, 0);
+  await db.run('UPDATE vip_posts SET likes_count=318 WHERE id=?', post.id);
+  assert.equal((await posts.like(post.id, order.id, true)).likes, 319);
+  assert.equal((await posts.like(post.id, order.id, true)).likes, 319);
+  assert.equal((await posts.feed(order.id))[0].likes, 319);
+  assert.equal((await posts.like(post.id, order.id, false)).likes, 318);
+  assert.equal((await posts.like(post.id, order.id, false)).likes, 318);
+  assert.equal((await posts.feed(order.id))[0].liked, false);
   post = await posts.save(post.id, { caption: 'Edited', sort_order: -1, published: false, version: post.version }, 'session');
   assert.equal((await posts.feed(order.id)).length, 0);
   await posts.archive(post.id, true, post.version);

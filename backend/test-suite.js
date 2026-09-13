@@ -35,7 +35,7 @@ async function api(method, path, body) {
     method,
     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + checkoutToken }
   };
-  if (body) opts.body = JSON.stringify(path === '/api/payments/pix' ? { ...body, checkoutToken } : body);
+  if (body) opts.body = JSON.stringify(path === '/api/payments/pix' ? { ...body, checkoutToken, client:{phone:'11999990000'} } : body);
   const res = await fetch(`${BASE}${path}`, opts);
   const json = await res.json().catch(() => ({}));
   return { status: res.status, body: json };

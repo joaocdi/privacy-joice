@@ -16,7 +16,7 @@ function customerColumns(client) {
   return {
     name: typeof client.name === 'string' ? client.name.trim().slice(0, 150) : null,
     email: typeof client.email === 'string' ? client.email.trim().toLowerCase().slice(0, 254) : null,
-    phone: typeof client.phone === 'string' ? client.phone.replace(/\D/g, '').slice(0, 15) || null : null,
+    phone: require('./buyer-phone')(client.phone) || (typeof client.phone === 'string' ? client.phone.replace(/\D/g, '').slice(0, 15) || null : null),
     documentHash: digits ? hash(digits) : null,
     documentLast3: digits ? digits.slice(-3) : null
   };

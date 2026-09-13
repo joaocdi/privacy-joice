@@ -155,6 +155,140 @@
     return upload.id;
   }
 
+  /* --------------------------------------------------- teaser de vídeo */
+
+  const TEASER = { seconds: 3, height: 240, fps: 15, blur: 7 };
+  /** Mesmo teto do servidor (post-media.js): a tela não promete o que o backend recusa. */
+  const MAX_MEDIA = 10;
+
+  /** O navegador desta máquina consegue gravar um teaser? */
+  function canRecord() {
+    return typeof MediaRecorder !== 'undefined'
+      && typeof HTMLCanvasElement.prototype.captureStream === 'function'
+      && (MediaRecorder.isTypeSupported('video/webm;codecs=vp9') || MediaRecorder.isTypeSupported('video/webm;codecs=vp8') || MediaRecorder.isTypeSupported('video/webm'));
+  }
+  function recorderMime() {
+    for (const type of ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm']) {
+      if (MediaRecorder.isTypeSupported(type)) return type;
+    }
+    return '';
+  }
+
+  /**
+   * Gera o teaser da HOME a partir do arquivo escolhido.
+   *
+   * O vídeo original NUNCA vai para a HOME. O que sai daqui é outro arquivo:
+   * ~3 segundos, 240p, SEM faixa de áudio e com o desfoque desenhado quadro a
+   * quadro dentro do canvas — ou seja, gravado no próprio arquivo, não
+   * aplicado por CSS que qualquer um desliga no inspetor.
+   *
+   * Só o canvas entra no MediaRecorder. O áudio do original não é lido, não é
+   * conectado e não existe na faixa gravada.
+   *
+   * Sem MediaRecorder no navegador, devolve `null` e o post fica só com o
+   * pôster desfocado que já existia. Em nenhum caso o original é usado.
+   */
+  async function deriveTeaser(file, say) {
+    if (!file.type.startsWith('video/') || !canRecord()) return null;
+    const url = URL.createObjectURL(file);
+    const video = document.createElement('video');
+    try {
+      video.muted = true; video.defaultMuted = true; video.volume = 0;
+      video.playsInline = true; video.preload = 'auto'; video.src = url;
+      await once(video, 'loadeddata');
+      const width = video.videoWidth, height = video.videoHeight;
+      if (!width || !height) return null;
+
+      const canvas = document.createElement('canvas');
+      const scale = Math.min(1, TEASER.height / height);
+      canvas.width = Math.max(2, Math.round(width * scale / 2) * 2);
+      canvas.height = Math.max(2, Math.round(height * scale / 2) * 2);
+      const ctx = canvas.getContext('2d');
+
+      // Começa um pouco depois do zero: o primeiro quadro costuma ser escuro.
+      const start = Math.min(1, Math.max(0, (video.duration || TEASER.seconds) / 6));
+      try { video.currentTime = start; await once(video, 'seeked'); } catch (_) { /* o começo serve */ }
+
+      const stream = canvas.captureStream(TEASER.fps);
+      const chunks = [];
+      const recorder = new MediaRecorder(stream, { mimeType: recorderMime(), videoBitsPerSecond: 320000 });
+      recorder.ondataavailable = event => { if (event.data && event.data.size) chunks.push(event.data); };
+      const finished = new Promise(resolve => { recorder.onstop = resolve; });
+
+      let painting = true;
+      const paint = () => {
+        if (!painting) return;
+        // O desfoque é desenhado AQUI: entra nos pixels do arquivo gravado.
+        ctx.filter = `blur(${TEASER.blur}px)`;
+        try { ctx.drawImage(video, 0, 0, canvas.width, canvas.height); } catch (_) { /* quadro perdido */ }
+        requestAnimationFrame(paint);
+      };
+      recorder.start();
+      paint();
+      try { await video.play(); } catch (_) { /* sem autoplay, os seeks ainda pintam */ }
+      say && say('Gerando o teaser da HOME…');
+
+      const limit = Math.min(TEASER.seconds, Math.max(0.5, (video.duration || TEASER.seconds) - start));
+      await new Promise(resolve => setTimeout(resolve, limit * 1000));
+      painting = false;
+      video.pause();
+      recorder.stop();
+      stream.getTracks().forEach(track => track.stop());
+      await finished;
+
+      if (!chunks.length) return null;
+      const blob = new Blob(chunks, { type: 'video/webm' });
+      if (!blob.size || blob.size > 3 * 1024 * 1024) return null;
+      return new File([blob], 'teaser.webm', { type: 'video/webm' });
+    } catch (_) {
+      return null;                       // falhou a derivação: fica sem teaser
+    } finally {
+      video.removeAttribute('src'); video.load();
+      URL.revokeObjectURL(url);
+    }
+  }
+
+  /**
+   * Mostra no painel o teaser que está valendo na HOME.
+   *
+   * Carrega pela MESMA rota pública do visitante, então o que aparece aqui é
+   * exatamente o que ele vê: 3 segundos, sem som, já desfocado no arquivo.
+   * Publicação de foto, sem teaser ou fora da HOME não mostra nada.
+   */
+  function teaserPreview(parent, post) {
+    if (!post || post.type !== 'video' || !post.show_as_preview) return null;
+    const wrap = el('div', 'am-field am-teaser');
+    wrap.append(el('span', null, 'Teaser da HOME'));
+    const video = document.createElement('video');
+    video.src = BASE + '/api/home/preview-video/' + encodeURIComponent(post.id);
+    video.muted = true; video.playsInline = true; video.preload = 'metadata';
+    video.loop = true; video.controls = false;
+    video.setAttribute('muted', ''); video.setAttribute('playsinline', '');
+    const note = el('small', null, `Teaser derivado de ~${TEASER.seconds}s, sem áudio e já desfocado. O vídeo completo não vai para a HOME.`);
+    // Sem teaser gravado ainda, a rota devolve 404: aí o aviso troca de texto.
+    video.addEventListener('error', () => {
+      video.remove();
+      note.textContent = 'Ainda sem teaser. Use "Trocar mídia" e escolha o vídeo de novo para gerar um.';
+    }, { once: true });
+    video.addEventListener('loadeddata', () => { video.play().catch(() => { video.controls = true; }); }, { once: true });
+    wrap.append(video, note);
+    parent.append(wrap);
+    return video;
+  }
+
+  /** Manda o teaser pela mesma esteira de upload, para a pasta de prévias. */
+  async function sendTeaser(file, say) {
+    let upload = await api('/uploads', 'POST', { size: file.size, mime: file.type, purpose: 'preview' });
+    while (!upload.complete) {
+      say && say(`Enviando o teaser: ${Math.round(upload.offset / file.size * 100)}%`);
+      const part = file.slice(upload.offset, Math.min(file.size, upload.offset + upload.chunkSize));
+      const sent = await api('/uploads/' + upload.id, 'PATCH', part,
+        { 'Content-Type': 'application/octet-stream', 'upload-offset': String(upload.offset) });
+      upload = { ...upload, ...sent };
+    }
+    return upload.id;
+  }
+
   /** Amostra minúscula para a prévia da HOME, gerada aqui e validada no servidor. */
   function once(node, event) {
     return new Promise((resolve, reject) => {
@@ -198,17 +332,164 @@
     return value;
   }
 
+  /**
+   * A LISTA de mídias da publicação.
+   *
+   * Uma foto continua sendo uma foto: a lista abre com um item só e o formulário
+   * parece o de sempre. "Adicionar foto ou vídeo" acrescenta linhas, e cada
+   * linha tem o seu próprio enquadramento, o seu botão de trocar arquivo, de
+   * remover e as setas de ordem — é a ordem daqui que vira a ordem do carrossel.
+   *
+   * Nada é enviado enquanto a criadora mexe: os arquivos só sobem no Salvar, e
+   * cada vídeo só gera teaser se a publicação estiver marcada para a HOME.
+   */
+  function mediaList(parent, post, context) {
+    const existing = Array.isArray(post?.media) && post.media.length
+      ? post.media
+      : post ? [{ id: 'item-' + post.id, type: post.type, crop: post.crop_data ? JSON.parse(post.crop_data) : null }] : [];
+    const rows = [];
+
+    const wrap = el('div', 'am-field am-media');
+    wrap.append(el('span', null, 'Mídias da publicação'));
+    const list = el('div', 'am-media-list');
+    wrap.append(list);
+    const add = button('+ Adicionar foto ou vídeo', () => pick(), 'am-btn am-media-add');
+    const hint = el('small', null, `Arraste no feed para ver uma a uma. Até ${MAX_MEDIA} mídias · JPG, PNG, WebP, MP4 ou WebM.`);
+    wrap.append(add, hint);
+    parent.append(wrap);
+
+    // Um <input file> escondido e reutilizado: abrir o seletor não pode
+    // depender de um campo visível por linha, senão o formulário vira uma pilha.
+    const picker = input('file');
+    picker.accept = 'image/jpeg,image/png,image/webp,video/mp4,video/webm';
+    picker.multiple = true;
+    picker.className = 'am-hidden-file';
+    wrap.append(picker);
+    let pickTarget = null;
+    picker.addEventListener('change', () => {
+      const files = [...picker.files];
+      picker.value = '';
+      if (!files.length) return;
+      if (pickTarget) { swapFile(pickTarget, files[0]); pickTarget = null; return; }
+      for (const file of files) {
+        if (rows.length >= MAX_MEDIA) { context.say(`No máximo ${MAX_MEDIA} mídias por publicação.`); break; }
+        addRow({ file });
+      }
+      redraw();
+    });
+    function pick(row) { pickTarget = row || null; picker.multiple = !row; picker.click(); }
+
+    function swapFile(row, file) {
+      row.file = file;
+      row.type = file.type.startsWith('video/') ? 'video' : 'image';
+      row.framing.setFile(file);
+      row.label.textContent = rowTitle(row);
+    }
+    const rowTitle = row => (row.type === 'video' ? 'Vídeo' : 'Foto') + (row.file ? ' · novo arquivo' : '');
+
+    function addRow(spec) {
+      const card = el('div', 'am-media-item');
+      const head = el('div', 'am-media-head');
+      const position = el('span', 'am-media-pos');
+      const label = el('strong', null, '');
+      head.append(position, label);
+      card.append(head);
+
+      const row = {
+        id: spec.id || null,
+        type: spec.type || (spec.file && spec.file.type.startsWith('video/') ? 'video' : 'image'),
+        file: spec.file || null,
+        card, label, position
+      };
+
+      row.framing = JoiceFrame.editor(card, {
+        src: spec.id && post ? BASE + '/api/admin/posts/' + encodeURIComponent(post.id) + '/media/' + encodeURIComponent(spec.id) : '',
+        type: row.type,
+        crop: spec.crop || null,
+        label: 'Enquadramento desta mídia'
+      });
+      if (spec.file) row.framing.setFile(spec.file);
+
+      const tools = el('div', 'am-media-tools');
+      tools.append(
+        button('Trocar', () => pick(row), 'am-btn am-btn-sm'),
+        button('↑', () => move(row, -1), 'am-btn am-btn-sm am-media-move'),
+        button('↓', () => move(row, 1), 'am-btn am-btn-sm am-media-move'),
+        button('Remover', () => remove(row), 'am-btn am-btn-sm am-media-remove')
+      );
+      card.append(tools);
+      list.append(card);
+      rows.push(row);
+      row.label.textContent = rowTitle(row);
+      return row;
+    }
+
+    function move(row, direction) {
+      const index = rows.indexOf(row);
+      const target = index + direction;
+      if (target < 0 || target >= rows.length) return;
+      rows.splice(index, 1);
+      rows.splice(target, 0, row);
+      redraw();
+    }
+    function remove(row) {
+      if (rows.length === 1) { context.say('A publicação precisa de pelo menos uma mídia.'); return; }
+      row.framing.destroy();
+      row.card.remove();
+      rows.splice(rows.indexOf(row), 1);
+      redraw();
+    }
+    function redraw() {
+      rows.forEach((row, index) => {
+        list.append(row.card);                       // reordena sem recriar nada
+        row.position.textContent = String(index + 1);
+        row.label.textContent = rowTitle(row);
+        row.card.classList.toggle('is-first', index === 0);
+      });
+      add.disabled = rows.length >= MAX_MEDIA;
+      wrap.classList.toggle('is-carousel', rows.length > 1);
+    }
+
+    existing.forEach(item => addRow({ id: item.id, type: item.type, crop: item.crop }));
+    if (!rows.length) addRow({ type: 'image' });
+    redraw();
+
+    return {
+      count: () => rows.length,
+      hasNewFile: () => rows.some(row => row.file),
+      destroy: () => rows.forEach(row => row.framing.destroy()),
+      /** Sobe o que for novo e devolve a lista final, na ordem da tela. */
+      async collect(say, wantsHome) {
+        const items = [];
+        for (const [index, row] of rows.entries()) {
+          const item = { crop: row.framing.get() };
+          if (row.id && !row.file) item.id = row.id;
+          if (row.file) {
+            say?.(`Enviando mídia ${index + 1} de ${rows.length}…`);
+            if (row.id) item.id = row.id;
+            try { item.preview_image = await derive(row.file, item.crop); }
+            catch (_) { say?.(`Não consegui gerar a amostra da mídia ${index + 1}.`); }
+            item.uploadId = await sendFile(row.file, say);
+            // Cada vídeo do carrossel tem o SEU teaser de ~3s.
+            if (wantsHome && row.file.type.startsWith('video/')) {
+              const teaser = await deriveTeaser(row.file, say);
+              if (teaser) item.previewUploadId = await sendTeaser(teaser, say);
+              else say?.('Sem teaser de vídeo neste navegador: a HOME mostra o pôster desfocado.');
+            }
+          }
+          items.push(item);
+        }
+        return items;
+      }
+    };
+  }
+
   function postSheet(post) {
     const editing = Boolean(post);
     openSheet(editing ? 'Editar publicação' : 'Nova publicação', context => {
-      const file = input('file');
-      file.accept = 'image/jpeg,image/png,image/webp,video/mp4,video/webm';
-      field(context.body, 'Foto ou vídeo', file,
-        editing ? 'Sem escolher arquivo, a mídia atual continua.' : `JPG, PNG, WebP, MP4 ou WebM · até ${Math.round(uploadMax / 1024 / 1024)} MB.`);
       if (storage !== 'supabase') context.say('O Storage do Supabase não está configurado: o envio de mídia vai falhar.');
+      const medias = mediaList(context.body, post, context);
 
-      const framing = JoiceFrame.editor(context.body, { src: post ? '/api/admin/posts/' + post.id + '/media' : '', type: post?.type || 'image', crop: post?.crop_data ? JSON.parse(post.crop_data) : null, label:'Enquadramento da publicação' });
-      file.addEventListener('change',()=>{if(file.files[0])framing.setFile(file.files[0]);});
       const caption = document.createElement('textarea');
       caption.rows = 4; caption.maxLength = 4000; caption.value = post?.caption || '';
       caption.placeholder = 'Escreva a legenda…';
@@ -226,31 +507,39 @@
 
       const published = checkbox(context.body, 'Publicado', post ? post.published : true);
       const preview = checkbox(context.body, 'Mostrar como prévia na HOME', post?.show_as_preview);
-      context.state = { file, caption, order, published, preview, likes, framing };
+      // Vídeo na HOME: mostra aqui o MESMO teaser derivado que o visitante vê,
+      // para a criadora conferir o trecho antes de deixar no ar.
+      teaserPreview(context.body, post);
+      context.state = { caption, order, published, preview, likes, medias };
     }, async context => {
-      const { file, caption, order, published, preview, likes, framing } = context.state;
-      const chosen = file.files[0];
+      const { caption, order, published, preview, likes, medias } = context.state;
+      const items = await medias.collect(context.say, preview.checked);
       const body = {
         caption: caption.value,
         sort_order: Number(order.value),
         published: published.checked,
         show_as_preview: preview.checked,
         likes_count: likesValue(likes.value),
-        crop: framing.get(),
+        // O enquadramento do post acompanha o do primeiro item: é ele que
+        // continua preenchendo as colunas antigas nesta fase.
+        crop: items[0].crop,
+        items,
         version: post?.version
       };
-      if (chosen) {
-        try { body.preview_image = await derive(chosen); }
-        catch (_) { context.say('Não consegui gerar a amostra da HOME desta mídia.'); }
-        body.uploadId = await sendFile(chosen, context.say);
-      }
-      if (!chosen && post && preview.checked && JSON.stringify(body.crop) !== (post.crop_data || '')) {
-        const response = await fetch('/api/admin/posts/' + post.id + '/media');
-        if (!response.ok) throw new Error('Não foi possível atualizar a prévia do enquadramento.');
-        body.preview_image = await derive(await response.blob());
+      // Só mudou o enquadramento de uma mídia que já existia? A amostra da
+      // HOME é refeita a partir do arquivo atual, sem reenviar nada.
+      if (post && preview.checked && !medias.hasNewFile()) {
+        const first = items[0];
+        const alvo = first.id ? '/api/admin/posts/' + post.id + '/media/' + encodeURIComponent(first.id)
+          : '/api/admin/posts/' + post.id + '/media';
+        const response = await fetch(BASE + alvo);
+        if (response.ok) {
+          try { body.preview_image = await derive(await response.blob(), first.crop); }
+          catch (_) { context.say('Não consegui atualizar a amostra da HOME.'); }
+        }
       }
       await api(editing ? '/posts/' + post.id : '/posts', editing ? 'PUT' : 'POST', body);
-      framing.destroy();
+      medias.destroy();
       context.close();
       toast(editing ? 'Publicação atualizada.' : 'Publicação criada.');
       await reload();
@@ -298,6 +587,12 @@
       try { changes.preview_image = await derive(chosen); }
       catch (_) { context.say('Não consegui gerar a amostra da HOME desta mídia.'); }
       changes.uploadId = await sendFile(chosen, context.say);
+      // O teaser antigo também era do arquivo antigo: some com ele. Quando a
+      // publicação está na HOME e a mídia nova é vídeo, um teaser novo entra.
+      if (post.show_as_preview && chosen.type.startsWith('video/')) {
+        const teaser = await deriveTeaser(chosen, context.say);
+        if (teaser) changes.previewUploadId = await sendTeaser(teaser, context.say);
+      }
       return changes;
     }, 'Mídia trocada.');
   }

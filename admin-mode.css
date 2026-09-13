@@ -206,6 +206,45 @@ body.am-on { padding-top: var(--am-bar-height, 56px); }
   /* O menu não pode passar da borda da tela em aparelho estreito. */
   .am-menu-list { min-width: 0; width: calc(100vw - 32px); max-width: 232px; }
 }
+/* ------------------------------------------------ lista de mídias do post */
+/* Uma mídia: parece o formulário de sempre. Duas ou mais: vira uma pilha
+   numerada, cada linha com o seu enquadramento e os seus botões. */
+.am-media { margin-bottom: 18px; }
+.am-media-list { display: flex; flex-direction: column; gap: 12px; margin: 6px 0 10px; }
+.am-media-item {
+  padding: 12px;
+  border: 1px solid #e2e0dd; border-radius: 14px;
+  background: #fbfaf9;
+}
+.am-media-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.am-media-pos {
+  flex: none;
+  min-width: 22px; height: 22px; padding: 0 6px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 11px; background: #eceae8;
+  font: 700 11.5px Inter, Arial, sans-serif; color: #4a4a52;
+}
+.am-media-head strong { font: 600 12.5px Inter, Arial, sans-serif; color: #2a2a30; }
+/* Uma mídia só: o número não ajuda em nada. */
+.am-media:not(.is-carousel) .am-media-pos { display: none; }
+.am-media-tools { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.am-media-tools .am-btn { flex: 1 1 auto; min-height: 44px; }
+.am-media-move { flex: 0 0 52px; font-size: 16px; }
+.am-media-remove { color: #b3261e; border-color: #f0cdc9; }
+.am-media:not(.is-carousel) .am-media-move,
+.am-media:not(.is-carousel) .am-media-remove { display: none; }
+.am-media-add { width: 100%; min-height: 44px; }
+.am-media-add:disabled { opacity: .5; }
+.am-hidden-file { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+
+/* O teaser da HOME dentro do painel: o mesmo arquivo que o visitante recebe. */
+.am-teaser video {
+  display: block; width: 100%; max-width: 240px;
+  margin: 2px 0 6px;
+  border: 1px solid #e2e0dd; border-radius: 12px;
+  background: #111;
+}
+
 /* Confirmação da exclusão permanente: precisa parecer diferente de tudo o que
    tem volta, e o botão só acende depois da caixa marcada. */
 .am-danger-box {

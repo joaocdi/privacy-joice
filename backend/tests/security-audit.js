@@ -141,7 +141,7 @@ check('allowlist de arquivos estáticos encontrada', Boolean(allowlist));
 if (allowlist) {
   const lista = allowlist[1].split(',').map((item) => item.trim().replace(/['"]/g, '')).filter(Boolean);
   check('allowlist só tem página, script, estilo e imagem de perfil',
-    lista.every((item) => /^(index\.html|app\.js|style\.css|vip\.(html|css|js)|avatar\.jpg|cover\.jpg|verified\.png|login\.(html|css|js)|admin-mode\.(css|js)|frame\.(css|js))$/.test(item)),
+    lista.every((item) => /^(index\.html|app\.js|style\.css|vip\.(html|css|js)|avatar\.jpg|cover\.jpg|verified\.png|login\.(html|css|js)|admin-mode\.(css|js)|frame\.(css|js)|carousel\.(css|js))$/.test(item)),
     lista.join(' '));
 }
 
@@ -227,7 +227,8 @@ const previewRoutes = [/app\.get\('\/api\/vip\/preview', requireAdmin[\s\S]*?\n\
 check('/api/vip/preview exige sessão administrativa',
   /app\.get\('\/api\/vip\/preview', requireAdmin/.test(serverJs));
 check('/api/vip/preview/media exige a mesma sessão administrativa',
-  /app\.get\('\/api\/vip\/preview\/media\/:postId', requireAdmin/.test(serverJs));
+  /app\.get\('\/api\/vip\/preview\/media\/:postId\/:mediaId\?', requireAdmin/.test(serverJs),
+  'com ou sem item do carrossel, a mesma tranca');
 check('requireAdmin reconfere a sessão do Supabase no banco',
   /async function requireAdmin[\s\S]{0,220}await adminAuth\.session\(req\)/.test(serverJs)
   && /async function adminRole\(userId\)[\s\S]{0,160}admin_users WHERE user_id=\? AND role='admin'/.test(fs.readFileSync(path.join(BACKEND, 'services', 'admin-auth.js'), 'utf8')));
@@ -248,6 +249,113 @@ check('expiração da signed URL é limitada a 60–300s',
 check('signed URL não é guardada em lugar nenhum',
   !/INSERT|UPDATE|localStorage|writeFile/.test(vipMediaJs));
 check('nada exige bucket público', !/public/i.test(vipMediaJs) || !/makePublic|getPublicUrl/.test(vipMediaJs));
+
+// Comentário cita o que NÃO é lido; tirá-los antes de testar evita falso alarme.
+const semComentarios = (code) => code.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*\/\/.*$/gm, ' ');
+
+secao('Teaser de vídeo da HOME');
+
+const teaserJs = fs.readFileSync(path.join(BACKEND, 'services', 'preview-video.js'), 'utf8');
+const teaserHomeJs = fs.readFileSync(path.join(ROOT, 'app.js'), 'utf8');
+const uploadsJs = fs.readFileSync(path.join(BACKEND, 'services', 'admin-uploads.js'), 'utf8');
+// O corpo do handler público, isolado: é ele que não pode encostar no original.
+const teaserRoute = /app\.get\('\/api\/home\/preview-video\/:postId\/:mediaId\?'[\s\S]*?\n\}\);/.exec(serverJs)?.[0] || '';
+const teaserPostsJs = fs.readFileSync(path.join(BACKEND, 'services', 'vip-posts.js'), 'utf8');
+const teaserLookup = /async function homeTeaserPath\([\s\S]*?\n\}/.exec(teaserPostsJs)?.[0] || '';
+
+check('o teaser tem rota pública própria',
+  /app\.get\('\/api\/home\/preview-video\/:postId\/:mediaId\?'/.test(serverJs),
+  'um teaser por item do carrossel, na mesma rota');
+check('a rota do teaser nunca lê o caminho do original',
+  teaserRoute.length > 0 && !/media_path|signLink|authorizeOrder|activeAccess|orderId/.test(teaserRoute),
+  'nem pedido, nem token, nem link assinado do arquivo pago');
+// Toda saída da busca do teaser passa pelo teste de prefixo. Em vez de casar
+// o nome de uma variável — que muda quando o carrossel entra —, conferimos que
+// NENHUM `return` devolve `preview_video` sem o `isPreviewPath` na mesma linha.
+const teaserReturns = teaserLookup.split('\n').filter(line => /return .*preview_video/.test(line));
+check('a rota do teaser só entrega caminho de prévia',
+  /homeTeaserPath/.test(teaserRoute)
+  && teaserReturns.length > 0
+  && teaserReturns.every(line => /isPreviewPath\(/.test(line))
+  && !/media_path/.test(teaserLookup),
+  'registro adulterado não consegue apontar a rota para joice/posts/');
+check('o teaser exige publicado, não arquivado e marcado como prévia',
+  /published=1 AND archived=0 AND show_as_preview=1/.test(teaserLookup));
+check('o prefixo do teaser é fechado e validado',
+  /\^joice\\\/previews\\\/\[A-Za-z0-9_-\]\{1,80\}\\\.\(webm\|mp4\)\$/.test(teaserJs),
+  'joice/previews/<id>.webm — qualquer outro caminho é recusado');
+check('o teaser vai para pasta separada do original no Storage',
+  /previewVideo\.PREFIX/.test(uploadsJs) && /joice\/posts\//.test(uploadsJs),
+  'original em joice/posts/, derivada em joice/previews/');
+check('o teaser tem limite próprio de tamanho',
+  /preview \? previewVideo\.MAX_BYTES : maxSize\(\)/.test(uploadsJs));
+check('a HOME só aceita URL da rota de teaser',
+  /item\.teaser\.startsWith\('\/api\/home\/preview-video\/'\)/.test(teaserHomeJs),
+  'a página recusa qualquer outro endereço de vídeo na prévia');
+check('o teaser da HOME toca sem som e sem baixar o arquivo inteiro',
+  /video\.muted = true/.test(teaserHomeJs) && /video\.preload = 'metadata'/.test(teaserHomeJs)
+  && /playsInline = true/.test(teaserHomeJs));
+check('o teaser congela no limite e não deixa passar dele',
+  /currentTime >= limit/.test(teaserHomeJs) && /currentTime > limit\) video\.currentTime = limit/.test(teaserHomeJs));
+check('rever o teaser não muda de arquivo',
+  !/\.src\s*=\s*[^;]*(media|vip)/i.test(teaserHomeJs) || /preview-video/.test(teaserHomeJs),
+  'o replay volta ao início da mesma derivada');
+check('o teaser antigo entra na fila de limpeza, e só ele',
+  /async function queueStaleTeaser[\s\S]{0,220}isPreviewPath\(path\)/.test(teaserPostsJs),
+  'a fila media_deletions nunca recebe um original por este caminho');
+
+secao('Carrossel multimídia');
+
+const carPostMedia = fs.readFileSync(path.join(BACKEND, 'services', 'post-media.js'), 'utf8');
+const carCleanup = fs.readFileSync(path.join(BACKEND, 'services', 'media-cleanup.js'), 'utf8');
+const carHome = fs.readFileSync(path.join(ROOT, 'app.js'), 'utf8');
+const carVip = fs.readFileSync(path.join(ROOT, 'vip.js'), 'utf8');
+const carJs = fs.readFileSync(path.join(ROOT, 'carousel.js'), 'utf8');
+const carHomePreviews = /async function homePreviews\(\)[\s\S]*?\n\}/.exec(teaserPostsJs)?.[0] || '';
+
+check('a prévia pública do carrossel não lê o caminho do original',
+  carHomePreviews.length > 0
+  && /fallback: false/.test(carHomePreviews)
+  && !/media_path/.test(semComentarios(carHomePreviews)),
+  'sem fallback: post sem item não vira slide, e o original nunca entra');
+check('a HOME só aceita item que traz a própria derivada',
+  /function isSafePreviewItem[\s\S]{0,400}data:image\/jpeg;base64,[\s\S]{0,200}\/api\/home\/preview-video\//.test(carHome),
+  'item sem amostra nem teaser some da lista em vez de cair no original');
+check('o teaser de um item é preso ao post que o contém',
+  /FROM vip_post_media WHERE id=\? AND post_id=\?/.test(teaserPostsJs),
+  'id de item de outra publicação não abre teaser aqui');
+check('o link assinado do VIP carrega post e item, e é reconferido',
+  /String\(link\.postId\)\.split\('#'\)/.test(serverJs)
+  && /findMediaItem\(postId, mediaId, \{ publishedOnly: true \}\)/.test(serverJs),
+  'link de um item não serve para outro item nem para outro post');
+check('cada item do carrossel exige publicação no ar para o assinante',
+  /publishedOnly \? 'published=1 AND archived=0' : 'archived=0'/.test(teaserPostsJs));
+check('remover item passa pela mesma limpeza segura',
+  /async function releaseOrphans[\s\S]{0,600}cleanup\.shared\(db, path\)/.test(carPostMedia)
+  && /media_deletions/.test(carPostMedia),
+  'a fila e a checagem de referências são as que já existiam');
+check('a checagem de referências enxerga os itens do carrossel',
+  /FROM vip_post_media WHERE media_path=\?/.test(carCleanup)
+  && /FROM vip_post_media WHERE preview_video=\?/.test(carCleanup),
+  'arquivo usado por outro item, avatar, capa ou feed antigo não é apagado');
+check('trocar a mídia de um item não apaga o original antigo',
+  /TROCAR a mídia de um item é diferente de REMOVER/.test(carPostMedia)
+  && !/orphans\.push\(item\.oldPath\)/.test(carPostMedia));
+check('excluir a publicação limpa todos os itens',
+  /const items = await postMedia\.listFor\(db, post\)[\s\S]{0,200}extras = items\.flatMap/.test(teaserPostsJs));
+check('a migração para o carrossel é aditiva e idempotente',
+  /NOT EXISTS \(SELECT 1 FROM vip_post_media m WHERE m\.post_id = p\.id\)/.test(fs.readFileSync(path.join(BACKEND, 'db', 'content-migrations.js'), 'utf8')),
+  'roda de novo sem duplicar e sem apagar as colunas antigas');
+check('só o slide visível toca, e o anterior pausa',
+  /if \(!video\.paused\) video\.pause\(\)/.test(carJs)
+  && /index === current/.test(carJs),
+  'nunca dois vídeos ao mesmo tempo');
+check('o carrossel não baixa tudo antes da hora',
+  /preload = index === 0 \? 'metadata' : 'none'/.test(carVip)
+  && /loading = index === 0 \? 'eager' : 'lazy'/.test(carVip),
+  'primeiro slide leve, os outros só ao se aproximar');
+check('uma mídia não ganha controle de carrossel',
+  /if \(count < 2\)[\s\S]{0,200}car-single/.test(carJs));
 
 secao('Exclusão permanente');
 
@@ -275,11 +383,21 @@ check('/api/home/previews é público mas não recebe pedido nem token',
   && !/\/api\/home\/previews[\s\S]{0,400}(authorizeOrder|signLink|activeAccess)/.test(serverJs),
   'sem autorização de comprador porque não entrega mídia paga');
 const homePreviewsBody = /async function homePreviews\(\)[\s\S]*?\n}/.exec(vipPostsJs)?.[0] || '';
-// A prévia lê a derivada minúscula e o enquadramento (números, não arquivo).
-// O que não pode aparecer aqui continua sendo o caminho e o link da mídia paga.
+// A prévia lê a derivada minúscula, o enquadramento (números) e o caminho do
+// teaser derivado. O que não pode aparecer é o caminho ou o link da mídia paga.
+// Em vez de comparar a lista de colunas letra por letra — que quebra a cada
+// coluna nova e some com a garantia —, conferimos QUAIS colunas são lidas.
+// Apenas a agregação pública é permitida; nenhuma identidade do assinante sai.
+const publicCountQuery = homePreviewsBody.replace('(SELECT COUNT(*) FROM vip_post_likes l WHERE l.post_id=vip_posts.id) AS likes', 'likes');
+const previewColumns = /SELECT ([a-z_,\s]+) FROM vip_posts/.exec(publicCountQuery)?.[1] || '';
+const PERMITIDAS = new Set(['id', 'type', 'caption', 'preview_image', 'crop_data', 'preview_video', 'likes_count', 'likes']);
 check('a prévia da HOME lê só a derivada, nunca media_path',
-  /SELECT id,type,caption,preview_image(,crop_data)? FROM vip_posts/.test(homePreviewsBody)
-  && !/media_path|signLink|deliver/.test(homePreviewsBody));
+  previewColumns.trim().length > 0
+  && previewColumns.split(',').map(c => c.trim()).every(c => PERMITIDAS.has(c))
+  // Sem os comentários: eles citam `media_path` justamente para explicar que
+  // ele não é lido, e isso derrubaria a própria checagem.
+  && !/media_path|signLink|deliver/.test(semComentarios(homePreviewsBody)),
+  previewColumns.replace(/\s+/g, ' ').trim());
 check('a prévia da HOME exige publicado, não arquivado e marcado',
   /published=1 AND archived=0 AND show_as_preview=1/.test(vipPostsJs));
 check('a derivada é validada no servidor, não no navegador',
@@ -292,7 +410,9 @@ check('só JPEG é aceito como derivada',
   && /\^\[A-Za-z0-9\+\/\]\+=\{0,2\}\$/.test(previewJs),
   'assinatura conferida e base64 restrito');
 check('trocar a mídia invalida a derivada antiga',
-  /input\.uploadId \? null/.test(vipPostsJs));
+  /input\.uploadId \|\| \(head && head\.uploadId\)/.test(vipPostsJs)
+  && /const trocou = Boolean\(item\.uploadId\)/.test(fs.readFileSync(path.join(BACKEND, 'services', 'post-media.js'), 'utf8')),
+  'vale para a mídia do post e para cada item do carrossel');
 check('marcar prévia sem derivada é recusado',
   /showAsPreview && !preview\) throw fail/.test(vipPostsJs));
 
@@ -323,7 +443,6 @@ const adminModeJs = fs.readFileSync(path.join(BACKEND, '..', 'admin-mode.js'), '
 const loginJs = fs.readFileSync(path.join(BACKEND, '..', 'login.js'), 'utf8');
 const loginHtml = fs.readFileSync(path.join(BACKEND, '..', 'login.html'), 'utf8');
 /** Tira comentários: a palavra "Supabase" numa explicação não é uso de API. */
-const semComentarios = (code) => code.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*\/\/.*$/gm, ' ');
 const frontendAdmin = semComentarios(loginJs) + semComentarios(adminModeJs) + loginHtml;
 
 check('o Supabase Auth é chamado pelo servidor, não pelo navegador',

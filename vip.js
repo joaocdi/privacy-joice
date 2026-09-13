@@ -263,25 +263,39 @@ function buildMediaPost(post, profile) {
   const box = document.createElement('div');
   box.className = 'vip-media';
 
-  if (post.type === 'video') {
-    box.classList.add('is-video');
-    const video = document.createElement('video');
-    video.src = API_BASE + post.media;
-    video.controls = true;
-    video.playsInline = true;
-    video.preload = 'metadata';
-    video.setAttribute('controlsList', 'nodownload');
-    box.append(video);
-  } else {
-    const image = document.createElement('img');
-    image.src = API_BASE + post.media;
-    image.alt = post.caption || 'Foto exclusiva da Joice';
-    image.loading = 'lazy';
-    box.append(image);
-  }
+  // Carrossel: uma mídia continua sendo uma mídia, e o cartão fica idêntico.
+  // Com duas ou mais, o mesmo cartão ganha swipe, setas e o indicador.
+  const items = Array.isArray(post.items) && post.items.length
+    ? post.items
+    : [{ id: post.id, type: post.type, crop: post.crop, media: post.media }];
+  if (items.some(item => item.type === 'video')) box.classList.add('is-video');
+
+  JoiceCarousel.build(box, items.map((item, index) => (cell) => {
+    if (item.type === 'video') {
+      const video = document.createElement('video');
+      video.src = API_BASE + item.media;
+      video.controls = true;
+      video.playsInline = true;
+      // Só o primeiro pede metadados; os outros só quando chegam perto.
+      video.preload = index === 0 ? 'metadata' : 'none';
+      video.setAttribute('playsinline', '');
+      video.setAttribute('controlsList', 'nodownload');
+      cell.append(video);
+      JoiceFrame.apply(video, item.crop, { box: cell });
+    } else {
+      const image = document.createElement('img');
+      image.src = API_BASE + item.media;
+      image.alt = post.caption || 'Foto exclusiva da Joice';
+      image.loading = index === 0 ? 'eager' : 'lazy';
+      cell.append(image);
+      JoiceFrame.apply(image, item.crop, { box: cell });
+    }
+  }), {
+    // O vídeo que entra em cena volta a poder tocar; o que sai já foi pausado.
+    onEnter: video => { if (video.preload === 'none') video.preload = 'metadata'; }
+  });
 
   article.append(box);
-  JoiceFrame.apply(box.querySelector("img,video"),post.crop,{box});
   if (post.caption) {
     const caption = document.createElement('p');
     caption.className = 'vip-caption';
@@ -308,7 +322,7 @@ function buildActions(post) {
   function update() {
     const liked = post.realLikes ? realLiked : likedPosts.has(id);
     like.classList.toggle('is-liked', liked); like.setAttribute('aria-pressed', String(liked));
-    like.setAttribute('aria-label', (liked ? 'Descurtir' : 'Curtir') + ' publicação ' + id);
+    like.setAttribute('aria-label', (liked ? 'Descurtir' : 'Curtir') + ' publicação');
     const value = post.realLikes ? realCount : base + Number(liked);
     count.textContent = value.toLocaleString('pt-BR');
   }
@@ -317,15 +331,17 @@ function buildActions(post) {
       const access = readAccess();
       if (!access || like.disabled) return;
       like.disabled = true;
+      const previous = { count: realCount, liked: realLiked };
+      realLiked = !realLiked; realCount += realLiked ? 1 : -1; update();
       try {
         const response = await fetch(`${API_BASE}/api/vip/${encodeURIComponent(access.orderId)}/posts/${encodeURIComponent(id)}/like`, {
-          method: 'PUT', headers: { Authorization: 'Bearer ' + access.token, 'Content-Type': 'application/json' }, body: JSON.stringify({ liked: !realLiked }), signal: AbortSignal.timeout(15000)
+          method: 'PUT', headers: { Authorization: 'Bearer ' + access.token, 'Content-Type': 'application/json' }, body: JSON.stringify({ liked: realLiked }), signal: AbortSignal.timeout(15000)
         });
         if (!response.ok) throw new Error('Não foi possível registrar a curtida.');
         const data = await response.json();
         realCount = data.likes; realLiked = data.liked; post.likes = realCount; post.liked = realLiked;
         like.title = 'Curtida atualizada.'; update();
-      } catch (_) { like.title = 'Não foi possível registrar. Tente novamente.'; }
+      } catch (_) { realCount = previous.count; realLiked = previous.liked; update(); like.title = 'Não foi possível registrar. Tente novamente.'; }
       finally { like.disabled = false; }
       return;
     }

@@ -90,7 +90,7 @@ async function main() {
   base = 'http://127.0.0.1:' + server.address().port;
 
   /* ---------------------------------------------------- criação do pedido */
-  const body = { productId: 'quarterly', checkoutToken: token, price: 0.01, amount: 1 };
+  const body = { productId: 'quarterly', checkoutToken: token, client: {phone:'11999990000'}, price: 0.01, amount: 1 };
   const [first, second] = await Promise.all([
     request('/api/payments/pix', body),
     request('/api/payments/pix', body)
@@ -196,7 +196,7 @@ async function main() {
   const stored = await (await getDb()).get('SELECT * FROM orders WHERE id=?', withClient.id);
   assert.equal(stored.customer_name, 'Maria Souza');
   assert.equal(stored.customer_email, 'maria@example.com');
-  assert.equal(stored.customer_phone, '31999998888', 'telefone normalizado alimenta o WhatsApp depois');
+  assert.equal(stored.customer_phone, '5531999998888', 'celular normalizado com código do país');
   assert.equal(stored.customer_document_last3, '725');
   assert.equal(stored.customer_document_hash, hash('52998224725'));
   // O CPF inteiro não pode estar em lugar nenhum da linha.
@@ -211,6 +211,20 @@ async function main() {
 
   process.env.VIP_MEDIA_DRIVER='supabase';
   await require('./crop-delete')(await getDb());
+  const likeDb = await getDb();
+  const likePosts = require('../services/vip-posts');
+  await likeDb.run("INSERT INTO vip_posts(id,type,media_path,media_driver,published,likes_count) VALUES ('likes-regression','image','joice/qa.jpg','supabase',1,318)");
+  await likePosts.setSource('managed');
+  const likeFeed = async () => (await likePosts.feed(order.id)).find(p => p.id === 'likes-regression');
+  assert.equal((await likeFeed()).liked, false, 'COUNT string zero must be false');
+  for (const liked of [true, true, false, false]) {
+    assert.equal((await likePosts.like('likes-regression', order.id, liked)).likes, 318 + Number(liked));
+    assert.equal((await likeFeed()).liked, liked);
+    assert.equal((await likeFeed()).likes, 318 + Number(liked));
+  }
+  console.log('PASS real PostgreSQL likes: count, duplicate like/unlike, persisted state, COUNT string zero');
+  process.env.VIP_MEDIA_SECRET = crypto.randomBytes(32).toString('hex');
+  await require('./buyer-recovery')(await getDb());
   console.log('PASS: Postgres — criação, duplo clique, webhook (token, divergência, idempotência),'
     + ' entitlement único, rollback atômico, VIP, expiração, formato de datas,'
     + ' cliente sem CPF em texto puro, status sem dados sensíveis');

@@ -28,6 +28,10 @@ CREATE TABLE IF NOT EXISTS vip_posts (
   -- never the original media. Added by migration on databases created earlier.
   show_as_preview INTEGER NOT NULL DEFAULT 0,
   preview_image TEXT,
+  -- Teaser de vídeo da HOME: o CAMINHO de um arquivo derivado e independente
+  -- (joice/previews/...), com ~3s, sem áudio e com o desfoque já gravado
+  -- dentro dele. Nunca aponta para o original em joice/posts/.
+  preview_video TEXT,
   -- Contagem exibida, definida pela criadora. As curtidas reais dos assinantes
   -- ficam em vip_post_likes e são somadas a este número na hora de mostrar.
   likes_count INTEGER NOT NULL DEFAULT 0,
@@ -36,6 +40,37 @@ CREATE TABLE IF NOT EXISTS vip_posts (
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS vip_posts_feed_idx ON vip_posts(creator_id,published,archived,sort_order,created_at);
+
+-- As mídias de uma publicação, em ordem.
+--
+-- Uma publicação pode ter uma foto só, como sempre teve, ou um carrossel
+-- misturando foto e vídeo. O que é do POST continua no post — legenda,
+-- curtidas, publicado, arquivado, prévia na HOME. O que é de CADA ARQUIVO
+-- mora aqui: o caminho no Storage, o enquadramento e as derivadas seguras.
+--
+-- preview_image e preview_video pertencem à mídia porque cada vídeo do
+-- carrossel tem o seu próprio teaser e cada foto a sua própria amostra.
+--
+-- As colunas antigas de mídia continuam em vip_posts de propósito: esta fase
+-- é aditiva, e o backend ainda sabe ler o modelo antigo se esta tabela
+-- estiver vazia para algum post.
+CREATE TABLE IF NOT EXISTS vip_post_media (
+  id TEXT PRIMARY KEY,
+  post_id TEXT NOT NULL REFERENCES vip_posts(id),
+  type TEXT NOT NULL CHECK (type IN ('image','video')),
+  media_path TEXT NOT NULL,
+  media_driver TEXT NOT NULL CHECK (media_driver IN ('local','supabase')),
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  crop_data TEXT,
+  preview_image TEXT,
+  preview_video TEXT,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS vip_post_media_order_idx ON vip_post_media(post_id,sort_order,created_at,id);
+-- Uma publicação não aponta duas vezes para o mesmo arquivo: a migração pode
+-- rodar de novo à vontade e o painel não duplica item por engano.
+CREATE UNIQUE INDEX IF NOT EXISTS vip_post_media_unique_idx ON vip_post_media(post_id,media_path);
 -- vip_posts_preview_idx is created by initDb, after the additive columns exist.
 CREATE TABLE IF NOT EXISTS vip_content_settings (
   id TEXT PRIMARY KEY CHECK (id = 'joice'),

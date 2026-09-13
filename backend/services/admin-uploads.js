@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const { getDb, transaction } = require('../db/database');
 const { fail } = require('./vip-posts');
 const { driverName } = require('./vip-media');
+const previewVideo = require('./preview-video');
 const CHUNK = 3 * 1024 * 1024;
 const FORMATS = { 'image/jpeg': ['jpg','image'], 'image/png': ['png','image'], 'image/webp': ['webp','image'], 'video/mp4': ['mp4','video'], 'video/webm': ['webm','video'] };
 function config() {
@@ -25,13 +26,21 @@ async function request(url, options = {}) {
 async function start(input, sessionId) {
   const { url, bucket } = config();
   const format = FORMATS[input.mime];
-  if (!format || !Number.isInteger(input.size) || input.size < 12 || input.size > maxSize()) throw fail('Formato ou tamanho não permitido. Use JPG, PNG, WebP, MP4 ou WebM.');
+  // O teaser da HOME vai para uma pasta própria e com limite próprio: ele é
+  // uma derivada de poucos segundos, não pode ocupar o lugar de um original.
+  const preview = input.purpose === 'preview';
+  if (preview && format?.[1] !== 'video') throw fail('O teaser da HOME precisa ser um vídeo MP4 ou WebM.');
+  const ceiling = preview ? previewVideo.MAX_BYTES : maxSize();
+  if (!format || !Number.isInteger(input.size) || input.size < 12 || input.size > ceiling) {
+    throw fail(preview ? 'Teaser grande demais. Ele deve ter poucos segundos em baixa resolução.'
+      : 'Formato ou tamanho não permitido. Use JPG, PNG, WebP, MP4 ou WebM.');
+  }
   const bucketResponse = await request(`${url}/storage/v1/bucket/${encodeURIComponent(bucket)}`);
   const bucketData = await bucketResponse.json();
   if (bucketData.public !== false) throw fail('O bucket precisa ser privado. Upload bloqueado.', 409);
   if (bucketData.file_size_limit && input.size > Number(bucketData.file_size_limit)) throw fail('Arquivo excede o limite do bucket.');
   const id = crypto.randomUUID();
-  const object = `joice/posts/${id}.${format[0]}`;
+  const object = preview ? `${previewVideo.PREFIX}${id}.${format[0]}` : `joice/posts/${id}.${format[0]}`;
   const metadata = Object.entries({ bucketName: bucket, objectName: object, contentType: input.mime, cacheControl: '60' })
     .map(([key, value]) => `${key} ${Buffer.from(value).toString('base64')}`).join(',');
   await (await getDb()).run("UPDATE vip_uploads SET pending_chunk='',remote_url=NULL WHERE expires_at<? AND complete=0", Date.now());

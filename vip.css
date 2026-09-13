@@ -730,3 +730,7 @@ body { background: #ecebe9; }
 .vip-cover img{height:100%;object-fit:cover;object-position:50% 55%;background:#f3f3f3}
 .vip-name{font-weight:600;letter-spacing:0}
 .vip-bio{font-size:13px;line-height:1.4;color:#222}
+
+/* Estado da curtida, compartilhado entre mouse e toque. */
+.vip-like.is-liked, .vip-like.is-liked svg { color: #e32646; fill: #e32646; stroke: #e32646; }
+@media (hover: hover) { .vip-like:hover, .vip-like:hover svg { color: #e32646; fill: #e32646; stroke: #e32646; } }
