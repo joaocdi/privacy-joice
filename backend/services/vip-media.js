@@ -272,7 +272,18 @@ async function deliver(req, res, source) {
   return streamLocal(req, res, source);
 }
 
+async function removePrivate(source) {
+  if (driverName() !== 'supabase' || !safeObjectPath(source) || !source.startsWith('joice/')) throw new Error('Storage deletion refused');
+  const { url, key, bucket } = supabaseConfig();
+  if (!url || !key || !bucket) throw new Error('Storage not configured');
+  const response = await fetch(`${url}/storage/v1/object/${encodeURIComponent(bucket)}`, {
+    method: 'DELETE', headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prefixes: [source] }), signal: AbortSignal.timeout(10000)
+  });
+  if (!response.ok) throw new Error('Storage deletion failed: ' + response.status);
+}
 module.exports = {
+  removePrivate,
   signLink, verifyLink, deliver, exists, resolveSource, mediaRoots,
   assertConfigured, safeObjectPath, driverName, signedUrlTtl, TTL_SECONDS
 };

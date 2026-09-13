@@ -28,8 +28,12 @@
     "qs": "^6.16.0"
   },
   "optionalDependencies": {
+    "node-telegram-bot-api": "^2.1.0",
     "sqlite": "^5.1.1",
-    "sqlite3": "^6.0.1",
-    "node-telegram-bot-api": "^2.1.0"
+    "sqlite3": "^6.0.1"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "@ffmpeg-installer/ffmpeg": "^1.1.0"
   }
 }

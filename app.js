@@ -2,22 +2,7 @@
    DATA: Creator & Content
    =========================== */
 
-const creator = {
-  name: "Joice M",
-  username: "@_johhh.of",
-  avatar: "./avatar.jpg",
-  cover: "./cover.jpg",
-  bio: "💋 Oi, eu sou a Joice. Aqui você vê o meu lado que eu não mostro em nenhum outro lugar 👀🔥 Conteúdo exclusivo, rotina e umas surpresas só pra quem entra...",
-  bioShort: "💋 Oi, eu sou a Joice. Aqui você vê o meu lado que eu não mostro em nenhum outro lugar 👀🔥 Conteúdo exclusivo, rotina e umas surpresas só p...",
-  verified: true,
-  stats: {
-    posts: 205,
-    photos: 64,
-    videos: 394,
-    likes: "1.5K"
-  },
-  instagram: "https://www.instagram.com/_johhh.of/"
-};
+// Profile data comes exclusively from /api/profile.
 
 const plans = [
   { id: "monthly",     label: "Assinatura mensal",      price: "R$ 9,90",  displayBtn: "Assinar agora R$ 9,90" },
@@ -34,27 +19,88 @@ const offerExpiresAt = null; // e.g. new Date(Date.now() + 57000)
 /* ===========================
    INIT: Populate DOM from data
    =========================== */
-(function initCreator() {
-  document.getElementById('profileName').textContent  = creator.name;
-  document.getElementById('profileUsername').textContent = creator.username;
-  document.getElementById('profileBio').textContent   = creator.bioShort;
+function applyProfile(profile) {
+  const text = (id, value) => { const el = document.getElementById(id); if (el && value != null) el.textContent = value; };
+  text('profileName', profile.name);
+  document.querySelectorAll('[data-profile-avatar]').forEach(el => { el.src = profile.avatar; el.alt = profile.name; JoiceFrame.apply(el,profile.avatarCrop,{role:"avatar"}); });
+  document.getElementById('coverImg').src = profile.cover;
+  JoiceFrame.apply(document.getElementById('coverImg'),profile.coverCrop,{role:'cover',box:document.querySelector('.cover-wrap')});
+  text('profileUsername', profile.username);
+  text('profileBio', profile.bio);
+  text('checkoutCreatorName', profile.name);
+  text('checkoutCreatorUser', profile.username);
+  document.querySelectorAll('.dynamic-post-name').forEach(el => el.textContent = profile.name);
+  document.querySelectorAll('.dynamic-post-username').forEach(el => el.textContent = profile.username);
 
-  document.getElementById('statPhotos').textContent  = creator.stats.photos;
-  document.getElementById('statVideos').textContent = creator.stats.videos;
-  document.getElementById('statLikes').textContent  = creator.stats.likes;
+  const stats = profile.stats;
+  if (stats) {
+    text('statPhotos', stats.photos);
+    text('statVideos', stats.videos);
+    text('statLikes', stats.likes);
+    // As abas repetem os mesmos números: mídias é a soma de fotos e vídeos.
+    text('tabPostsLabel', `${stats.posts} Postagens`);
+    text('tabMediaLabel', `${Number(stats.photos || 0) + Number(stats.videos || 0)} Mídias`);
+  }
 
-  document.getElementById('tabPostsLabel').textContent = creator.stats.posts + ' Postagens';
-  document.getElementById('tabMediaLabel').textContent = (creator.stats.photos + creator.stats.videos) + ' Mídias';
-
-  document.querySelectorAll('.dynamic-post-name').forEach(el => el.textContent = creator.name);
-  document.querySelectorAll('.dynamic-post-username').forEach(el => el.textContent = creator.username);
-
-  document.getElementById('chatNameEl').textContent   = creator.name;
-  document.getElementById('checkoutCreatorName').textContent = creator.name;
-  document.getElementById('checkoutCreatorUser').textContent = creator.username;
+  const location = document.getElementById('profileLocation');
+  if (location) {
+    const value = profile.location || '';
+    document.getElementById('profileLocationText').textContent = value || '';
+    location.hidden = !value;
+  }
 
   const viewers = document.getElementById('viewerCountEl');
   if (viewers) viewers.textContent = viewerCount + ' assistindo agora';
+}
+
+
+/**
+ * Feed bloqueado da HOME.
+ *
+ * Duas origens, mesma marcação e mesmo CSS:
+ *  - estática: os blocos já escritos no index.html (prévias pré-renderizadas);
+ *  - gerenciada: as publicações marcadas em /admin como "prévia na HOME".
+ *
+ * Em nenhuma das duas a mídia original chega ao visitante. O que ele recebe é
+ * uma derivada minúscula; o arquivo pago continua atrás do link assinado.
+ *
+ * As legendas abaixo são de apresentação. Nenhuma contagem de curtidas é
+ * exibida aqui: números simulados não devem parecer engajamento real.
+ */
+const HOME_CAPTIONS = [
+  'Um bom dia diferente, só por aqui.',
+  'Os pequenos detalhes da minha rotina.',
+  'Um momento que guardei para o clube.',
+  'Tem coisas que eu só compartilho aqui.',
+  'Meu diário, do meu jeito.',
+  'Sem pressa. Sem filtro. Mais perto.',
+  'O próximo capítulo te espera.'
+];
+function decorateLockedPost(post, { type, caption, id }) {
+  const head = post.previousElementSibling;
+  const article = document.createElement('article');
+  article.className = 'preview-post';
+  article.dataset.type = type;
+  // Só serve para o modo administrador casar o cartão com o registro certo.
+  if (id != null) article.dataset.postId = String(id);
+  post.parentNode.insertBefore(article, head);
+  article.append(head);
+  const captionEl = document.createElement('p');
+  captionEl.className = 'preview-caption'; captionEl.textContent = caption;
+  // Sem etiqueta de FOTO/VÍDEO e sem faixa sobre a mídia: o feed fica limpo.
+  head.querySelector('.post-menu')?.remove();
+  article.append(captionEl, post);
+  const footer = document.createElement('div');
+  footer.className = 'preview-engagement';
+  const left = document.createElement('span'); left.textContent = 'Conteúdo exclusivo';
+  const note = document.createElement('span'); note.textContent = 'Só para assinantes';
+  footer.append(left, note); article.append(footer);
+  return article;
+}
+(function polishHomeFeed() {
+  document.querySelectorAll('.locked-post').forEach((post, index) => {
+    decorateLockedPost(post, { type: index === 0 ? 'image' : 'video', caption: HOME_CAPTIONS[index] });
+  });
 })();
 
 /* ===========================
@@ -62,11 +108,19 @@ const offerExpiresAt = null; // e.g. new Date(Date.now() + 57000)
    =========================== */
 function openModal(id) {
   const el = document.getElementById(id);
-  if (el) { el.classList.add('open'); document.body.style.overflow = 'hidden'; }
+  if (el) {
+    el.returnFocus = document.activeElement;
+    el.classList.add('open'); document.body.style.overflow = 'hidden';
+    el.querySelector('button, input, a[href]')?.focus({ preventScroll: true });
+  }
 }
 function closeModal(id) {
   const el = document.getElementById(id);
-  if (el) { el.classList.remove('open'); document.body.style.overflow = ''; }
+  if (el) {
+    const wasOpen = el.classList.contains('open');
+    el.classList.remove('open'); document.body.style.overflow = '';
+    if (wasOpen && el.returnFocus?.isConnected) el.returnFocus.focus({ preventScroll: true });
+  }
 }
 
 document.querySelectorAll('.modal-overlay').forEach(overlay => {
@@ -218,7 +272,7 @@ window.addEventListener('pagehide', closeCheckout);
 /* ===========================
    LIVE BADGE → Live Modal
    =========================== */
-document.getElementById('badgeLive').addEventListener('click', () => openModal('liveModalOverlay'));
+document.getElementById('avatarLive')?.addEventListener('click', () => openCheckout('monthly'));
 document.getElementById('closeLiveModal')?.addEventListener('click', () => closeModal('liveModalOverlay'));
 document.getElementById('btnLiveJoin')?.addEventListener('click', () => {
   closeModal('liveModalOverlay');
@@ -271,62 +325,10 @@ function updateWapTimer() {
 }
 
 /* ===========================
-   FLOATING CHAT → Chat Modal
+   BOTÃO FLUTUANTE
+   Mesma ação do Chat do perfil: abre o WhatsApp da Joice.
    =========================== */
-document.getElementById('floatingChatAvatar').addEventListener('click', () => {
-  const badge = document.getElementById('chatBadge');
-  if (badge) badge.style.display = 'none';
-  openModal('chatModalOverlay');
-});
-document.getElementById('closeChatModal').addEventListener('click', () => closeModal('chatModalOverlay'));
-
-/* Chat send */
-const chatInput   = document.getElementById('chatInput');
-const chatBody    = document.getElementById('chatBody');
-const chatSendBtn = document.getElementById('chatSendBtn');
-
-const messages = [
-  { id: 1, sender: 'creator', text: 'Vem falar comigo, meu bem 💋', createdAt: new Date() }
-];
-
-let creatorReplied = false;
-
-function sendChatMessage() {
-  const text = chatInput.value.trim();
-  if (!text) return;
-  
-  // 1. User sends message
-  const visitorMsg = { id: messages.length + 1, sender: 'visitor', text, createdAt: new Date() };
-  messages.push(visitorMsg);
-  
-  const visitorBubble = document.createElement('div');
-  visitorBubble.className = 'chat-bubble sent';
-  visitorBubble.textContent = text;
-  chatBody.appendChild(visitorBubble);
-  
-  chatInput.value = '';
-  chatBody.scrollTop = chatBody.scrollHeight;
-  
-  // 2. Immediately show small unlock screen when user responds
-  if (!creatorReplied) {
-    creatorReplied = true;
-    setTimeout(() => {
-      document.getElementById('chatUnlockOverlay').style.display = 'flex';
-    }, 300);
-  }
-}
-chatSendBtn.addEventListener('click', sendChatMessage);
-chatInput.addEventListener('keydown', e => { if (e.key === 'Enter') sendChatMessage(); });
-
-document.getElementById('btnChatUnlock').addEventListener('click', () => {
-  document.getElementById('chatUnlockOverlay').style.display = 'none';
-  closeModal('chatModalOverlay');
-  openCheckout('chat-unlock');
-});
-
-document.getElementById('btnChatUnlockSkip').addEventListener('click', () => {
-  document.getElementById('chatUnlockOverlay').style.display = 'none';
-});
+document.getElementById('floatingChatAvatar')?.addEventListener('click', openWhatsapp);
 
 /* ===========================
    SUBSCRIBE / PLAN BUTTONS
@@ -351,11 +353,115 @@ if (promoToggle && promoContent) {
     promoToggle.classList.toggle('closed');
     promoContent.classList.toggle('closed');
   });
+  promoToggle.addEventListener('keydown', event => {
+    if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); promoToggle.click(); }
+  });
 }
 
-document.querySelectorAll('.btn-unlock').forEach(btn => {
-  btn.addEventListener('click', () => openCheckout('monthly'));
+// Delegado: as prévias gerenciadas em /admin entram no DOM depois daqui.
+document.addEventListener('click', event => {
+  if (event.target.closest('.btn-unlock')) openCheckout('monthly');
 });
+
+/* ===========================
+   MIMO E CHAT
+   Mimo é informativo: não cria pedido nem cobrança.
+   Chat abre o WhatsApp da Joice, quando o número estiver configurado no
+   servidor (WHATSAPP_NUMBER). Sem número, mostra o mesmo aviso — o número
+   nunca fica escrito no frontend.
+   =========================== */
+let whatsappUrl = null;
+function showNotice(title, text) {
+  document.getElementById('noticeTitle').textContent = title;
+  document.getElementById('noticeText').textContent = text;
+  openModal('noticeModalOverlay');
+}
+document.getElementById('noticeClose')?.addEventListener('click', () => closeModal('noticeModalOverlay'));
+function openWhatsapp() {
+  if (whatsappUrl) return window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
+  showNotice('Em breve', 'O contato direto ainda não está disponível. Assim que abrir, você vê o aviso aqui mesmo na página.');
+}
+document.getElementById('btnChat')?.addEventListener('click', openWhatsapp);
+document.getElementById('btnMimo')?.addEventListener('click', () => showNotice(
+  'Mimo',
+  'O envio de mimo ainda não está aberto. Por enquanto, a melhor forma de chegar perto é a assinatura.'
+));
+(async function loadProfile() {
+  try {
+    const response = await fetch(API_BASE + '/api/profile', { signal: AbortSignal.timeout(8000) });
+    if (!response.ok) throw new Error('Perfil indisponível');
+    const profile = await response.json();
+    if (profile && typeof profile.name === 'string') applyProfile(profile);
+  } catch (_) { document.getElementById('profileBio').textContent = 'Não foi possível carregar o perfil. Atualize a página.'; }
+})();
+
+(async function loadContact() {
+  try {
+    const response = await fetch(API_BASE + '/api/contact', { signal: AbortSignal.timeout(8000) });
+    if (!response.ok) return;
+    const data = await response.json();
+    if (typeof data.whatsapp === 'string' && data.whatsapp.startsWith('https://')) whatsappUrl = data.whatsapp;
+  } catch (_) { /* sem contato configurado: o aviso acima assume */ }
+})();
+
+/**
+ * Troca as prévias estáticas pelas publicações marcadas em /admin.
+ *
+ * Falha em silêncio de propósito: sem backend, sem posts marcados ou com erro
+ * de rede, a página continua exatamente como está no HTML. A amostra vem
+ * pronta do servidor como imagem minúscula — não existe caminho de mídia aqui.
+ */
+(async function loadManagedPreviews() {
+  let previews;
+  let managed = false;
+  try {
+    const response = await fetch(API_BASE + '/api/home/previews', { signal: AbortSignal.timeout(8000) });
+    if (!response.ok) return;
+    const data = await response.json(); previews = data.previews; managed = data.source === 'managed';
+  } catch (_) { return; }
+  if (!Array.isArray(previews)) return;
+  if (previews.length === 0) {
+    if (managed) document.querySelectorAll('.preview-post').forEach(post => post.remove());
+    return;
+  }
+
+  const existing = document.querySelectorAll('.preview-post');
+  const blueprint = existing[0]?.querySelector('.post-header');
+  const anchor = document.querySelector('#contentTabs .tabs-bar');
+  if (!blueprint || !anchor) return;
+
+  const fragment = document.createDocumentFragment();
+  previews.forEach((item, index) => {
+    if (!item || typeof item.preview !== 'string' || !item.preview.startsWith('data:image/jpeg;base64,')) return;
+    const header = blueprint.cloneNode(true);
+    header.querySelector('.post-type')?.remove();
+    const locked = document.createElement('div');
+    locked.className = 'locked-post';
+    const image = document.createElement('img');
+    image.className = 'locked-img';
+    image.src = item.preview;
+    image.alt = item.type === 'video' ? 'Prévia desfocada de um vídeo exclusivo' : 'Prévia desfocada de uma foto exclusiva';
+    image.loading = 'lazy'; image.width = 64; image.height = 80;
+    const overlay = document.createElement('div');
+    overlay.className = 'locked-overlay';
+    overlay.innerHTML = document.querySelector('.locked-overlay')?.innerHTML || '';
+    locked.append(image, overlay);
+    JoiceFrame.apply(image,item.crop,{box:locked});
+    fragment.append(header, locked);
+  });
+  if (!fragment.childNodes.length) return;
+
+  existing.forEach(article => article.remove());
+  anchor.after(fragment);
+  document.querySelectorAll('.locked-post').forEach((post, index) => {
+    const item = previews[index];
+    decorateLockedPost(post, {
+      id: item.id,
+      type: item.type === 'video' ? 'video' : 'image',
+      caption: item.caption || HOME_CAPTIONS[index % HOME_CAPTIONS.length]
+    });
+  });
+})();
 
 /* ===========================
    CHECKOUT CLOSE & PIX ACTIONS
@@ -421,10 +527,16 @@ document.getElementById('btnAccessNow')?.addEventListener('click', async () => {
    CONTENT TABS
    =========================== */
 document.getElementById('tab1').addEventListener('click', () => {
+  document.getElementById('contentTabs').classList.remove('media-grid');
+  document.getElementById('tab1').setAttribute('aria-pressed', 'true');
+  document.getElementById('tab2').setAttribute('aria-pressed', 'false');
   document.getElementById('tab1').classList.add('active');
   document.getElementById('tab2').classList.remove('active');
 });
 document.getElementById('tab2').addEventListener('click', () => {
+  document.getElementById('contentTabs').classList.add('media-grid');
+  document.getElementById('tab1').setAttribute('aria-pressed', 'false');
+  document.getElementById('tab2').setAttribute('aria-pressed', 'true');
   document.getElementById('tab2').classList.add('active');
   document.getElementById('tab1').classList.remove('active');
 });
@@ -432,11 +544,13 @@ document.getElementById('tab2').addEventListener('click', () => {
 /* ===========================
    BIO: Read more / less
    =========================== */
+// Uma bio só: recolhida em três linhas pelo CSS e aberta por aqui. Assim não
+// existe uma versão curta que possa ficar diferente da do /vip.
 let bioExpanded = false;
 document.getElementById('readMoreBtn').addEventListener('click', () => {
   bioExpanded = !bioExpanded;
-  document.getElementById('profileBio').textContent   = bioExpanded ? creator.bio : creator.bioShort;
-  document.getElementById('readMoreBtn').textContent  = bioExpanded ? 'Ler menos' : 'Ler mais';
+  document.getElementById('profileBio').classList.toggle('expanded', bioExpanded);
+  document.getElementById('readMoreBtn').textContent = bioExpanded ? 'Ler menos' : 'Ler mais';
 });
 
 /* ===========================
@@ -471,4 +585,16 @@ document.querySelectorAll('img:not(#pixQrImage)').forEach(img => {
     this.parentNode.insertBefore(div, this);
     this.style.display = 'none';
   });
+});
+
+document.addEventListener('keydown', event => {
+  const modal = document.querySelector('.modal-overlay.open');
+  if (!modal) return;
+  if (event.key === 'Escape' && modal.id !== 'checkoutModalOverlay') closeModal(modal.id);
+  if (event.key !== 'Tab') return;
+  const items = [...modal.querySelectorAll('button:not(:disabled), input, a[href], [tabindex="0"]')]
+    .filter(element => element.getClientRects().length);
+  const first = items[0], last = items.at(-1);
+  if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+  else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
 });

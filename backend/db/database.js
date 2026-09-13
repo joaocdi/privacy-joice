@@ -45,6 +45,14 @@ async function initDb() {
 
   // Execute the schema to create tables if they don't exist
   await db.exec(schema);
+  await db.exec(fs.readFileSync(path.join(__dirname, 'schema.content.sql'), 'utf8'));
+  await require('./content-migrations').migrate(db);
+  // Additive: databases created before the HOME preview feature keep their rows.
+  const contentColumns = new Set((await db.all('PRAGMA table_info(vip_posts)')).map(c => c.name));
+  for (const [name, type] of Object.entries({ show_as_preview: 'INTEGER NOT NULL DEFAULT 0', preview_image: 'TEXT', likes_count: 'INTEGER NOT NULL DEFAULT 0' })) {
+    if (!contentColumns.has(name)) await db.exec(`ALTER TABLE vip_posts ADD COLUMN ${name} ${type}`);
+  }
+  await db.exec('CREATE INDEX IF NOT EXISTS vip_posts_preview_idx ON vip_posts(creator_id,published,archived,show_as_preview,sort_order)');
   const columns = new Set((await db.all('PRAGMA table_info(orders)')).map(c => c.name));
   const additions = {
     checkout_hash: 'TEXT', pix_qr_code: 'TEXT', webhook_token_hash: 'TEXT',

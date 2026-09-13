@@ -29,6 +29,9 @@ let pool = null;
 
 function getPool() {
   if (pool) return pool;
+  if (process.env.NODE_ENV === 'test' && !/^test_[a-f0-9_]+$/.test(process.env.TEST_DATABASE_SCHEMA || '')) {
+    throw new Error('ABORT: PostgreSQL tests require an isolated test_<uuid> schema; public is forbidden.');
+  }
 
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) throw new Error('DATABASE_URL ausente.');
@@ -161,6 +164,17 @@ function getDb() {
 async function initDb() {
   const schema = fs.readFileSync(path.resolve(__dirname, 'schema.postgres.sql'), 'utf8');
   await getPool().query(schema);
+  await getPool().query(fs.readFileSync(path.join(__dirname, 'schema.content.sql'), 'utf8'));
+  await require('./content-migrations').migrate(await getDb(), true);
+  // Additive: databases created before the HOME preview feature keep their rows.
+  await getPool().query('ALTER TABLE vip_posts ADD COLUMN IF NOT EXISTS show_as_preview INTEGER NOT NULL DEFAULT 0');
+  await getPool().query('ALTER TABLE vip_posts ADD COLUMN IF NOT EXISTS preview_image TEXT');
+  await getPool().query('ALTER TABLE vip_posts ADD COLUMN IF NOT EXISTS likes_count INTEGER NOT NULL DEFAULT 0');
+  await getPool().query('CREATE INDEX IF NOT EXISTS vip_posts_preview_idx ON vip_posts(creator_id,published,archived,show_as_preview,sort_order)');
+  // No public Data API access: all content/admin operations go through our backend.
+  for (const table of ['media_deletions', 'creator_profiles', 'vip_posts', 'vip_content_settings', 'vip_post_likes', 'admin_sessions', 'admin_login_limits', 'vip_uploads', 'admin_users']) {
+    await getPool().query(`ALTER TABLE ${table} ENABLE ROW LEVEL SECURITY`);
+  }
   return getDb();
 }
 

@@ -2,7 +2,8 @@ const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
 const root = path.resolve(__dirname, '..');
-const files = [path.join(root, '..', 'app.js'), path.join(root, '..', 'api', 'index.js')];
+const files = ['app.js','vip.js','frame.js','admin-mode.js','login.js'].map(file=>path.join(root,'..',file));
+files.push(path.join(root,'..','api','index.js'));
 function walk(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     if (['node_modules', '.test-runs'].includes(entry.name)) continue;

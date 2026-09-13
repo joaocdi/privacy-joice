@@ -1,3 +1,4 @@
+require('./sqlite-env');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -6,6 +7,8 @@ const assert = require('node:assert/strict');
 const directory = path.resolve(__dirname, '..', '.test-runs');
 fs.mkdirSync(directory, { recursive: true });
 process.env.DATABASE_PATH = path.join(directory, crypto.randomUUID() + '.sqlite');
+// Never inherit the real DATABASE_URL from backend/.env in the SQLite suite.
+process.env.DATABASE_URL = '';
 process.env.PAYMENT_PROVIDER = 'mock';
 process.env.NODE_ENV = 'test';
 process.env.ENABLE_TELEGRAM_BOT = 'false';
@@ -75,6 +78,40 @@ async function main() {
   for (const route of ['/backend/server.js','/backend/db/database.sqlite','/backend/.env','/Privacy_Sites.zip','/Area_membro/x.jpeg']) {
     assert.equal((await request(route)).status, 404, route);
   }
+  // Perfil: uma fonte só para as duas telas.
+  const publicProfile = (await request('/api/profile')).body;
+  const vipProfile = require('../vip-content').profile;
+  for (const field of ['name', 'username', 'bio']) {
+    assert.equal(publicProfile[field], vipProfile[field], 'perfil público difere do /vip em ' + field);
+  }
+  assert.deepEqual(publicProfile.stats, vipProfile.stats, 'números do perfil divergem entre as telas');
+  assert.ok(!JSON.stringify(publicProfile).includes('media_path') && publicProfile.avatar.startsWith('/api/profile/media/avatar?') && publicProfile.cover.startsWith('/api/profile/media/cover?'),
+    'o perfil público fornece somente rotas fixas de imagens do perfil');
+  const homeHtml = await fetch(base + '/index.html').then(r => r.text());
+  assert.ok(homeHtml.includes('id="profileName"') && !homeHtml.includes(vipProfile.bio),
+    'a HOME carrega o perfil compartilhado sem duplicar a bio');
+  assert.ok(!/VÍDEO EXCLUSIVO|MEU DIÁRIO/.test(homeHtml + await fetch(base + '/app.js').then(r => r.text())),
+    'a faixa de vídeo exclusivo saiu do feed');
+  assert.ok(!/vip-post-type/.test(await fetch(base + '/vip.js').then(r => r.text())),
+    'a etiqueta FOTO/VÍDEO saiu do feed do assinante');
+
+  // Contato do WhatsApp: montado no servidor, nunca escrito no frontend.
+  assert.equal((await request('/api/contact')).body.whatsapp, null, 'sem número configurado não existe link');
+  process.env.WHATSAPP_NUMBER = '+55 (48) 99999-0000';
+  assert.equal((await request('/api/contact')).body.whatsapp, 'https://wa.me/5548999990000');
+  process.env.WHATSAPP_MESSAGE = 'Oi Joice!';
+  assert.equal((await request('/api/contact')).body.whatsapp, 'https://wa.me/5548999990000?text=Oi%20Joice!');
+  for (const invalid of ['123', 'javascript:alert(1)', 'abcdefghij', '1'.repeat(16)]) {
+    process.env.WHATSAPP_NUMBER = invalid;
+    assert.equal((await request('/api/contact')).body.whatsapp, null, 'número inválido: ' + invalid);
+  }
+  delete process.env.WHATSAPP_NUMBER; delete process.env.WHATSAPP_MESSAGE;
+  const ordersBeforeContact = (await db.get('SELECT COUNT(*) n FROM orders')).n;
+  await request('/api/contact');
+  assert.equal((await db.get('SELECT COUNT(*) n FROM orders')).n, ordersBeforeContact, 'consultar o contato não cria pedido');
+  const homePage = await fetch(base + '/index.html').then(r => r.text());
+  const homeScript = await fetch(base + '/app.js').then(r => r.text());
+  assert.ok(!/wa\.me|whatsapp\.com|\+?55\d{10}/i.test(homePage + homeScript), 'nenhum número ou link do WhatsApp no frontend');
   assert.equal((await request('/api/health', undefined, { Origin: 'https://evil.example' })).status, 403);
   assert.equal((await request('/api/payments/pix', { productId:'whatsapp_unlock', checkoutToken:token })).status, 409);
   assert.equal(require('../products').whatsapp_unlock.price, 8.9);
@@ -93,10 +130,15 @@ async function main() {
   assert.equal((await (await getDb()).get('SELECT status FROM orders WHERE id=?', order.id)).status, 'PAID');
   console.log('PASS: concurrency, rollback, webhook validation/idempotency, authorization, expiry, price and persistence');
   await child('tests/provider.js');
+  await child('tests/isolation.js');
   await child('tests/migration.js');
   await child('tests/persistence.js');
   await child('tests/vip.js');
   await child('tests/vip-supabase.js');
+  await child('tests/admin.js');
+  await child('tests/admin-mode.js');
+  await child('tests/crop-delete.js');
+  await child('tests/content-postgres.js');
 }
 main().catch(error => { console.error(error); process.exitCode = 1; }).finally(async () => {
   if (server) await new Promise(resolve => server.close(resolve));

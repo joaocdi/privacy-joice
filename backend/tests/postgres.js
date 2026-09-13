@@ -13,6 +13,7 @@
  */
 const assert = require('node:assert/strict');
 const crypto = require('crypto');
+require('dotenv').config();
 
 const url = process.env.TEST_DATABASE_URL;
 if (!url) {
@@ -26,6 +27,34 @@ process.env.NODE_ENV = 'test';
 process.env.ENABLE_TELEGRAM_BOT = 'false';
 process.env.TELEGRAM_BOT_USERNAME = 'TestJoiceBot';
 process.env.FRONTEND_URL = 'http://localhost:5500';
+
+// Every test query is confined to a fresh schema, including transaction-pooler connections.
+const pg = require('pg');
+const RealPool = pg.Pool;
+const testSchema = 'test_' + crypto.randomBytes(12).toString('hex');
+process.env.TEST_DATABASE_SCHEMA = testSchema;
+const control = new RealPool({ connectionString: url });
+class IsolatedPool extends RealPool {
+  async connect() {
+    const client = await super.connect();
+    const query = client.query.bind(client);
+    return { release: () => client.release(), query: async (sql, values) => {
+      const result = await query(sql, values);
+      if (/^BEGIN\b/i.test(String(sql))) {
+        await query(`SET LOCAL search_path TO ${testSchema}`);
+        assert.equal((await query('SELECT current_schema() AS name')).rows[0].name, testSchema, 'ABORT: public or unisolated schema');
+      }
+      return result;
+    } };
+  }
+  async query(sql, values) {
+    const client = await this.connect();
+    try { await client.query('BEGIN'); const result = await client.query(sql, values); await client.query('COMMIT'); return result; }
+    catch (error) { await client.query('ROLLBACK'); throw error; }
+    finally { client.release(); }
+  }
+}
+Object.defineProperty(pg, 'Pool', { value: IsolatedPool });
 
 const { app } = require('../server');
 const { getDb, initDb, closeDb, driver } = require('../db/database');
@@ -52,8 +81,8 @@ async function main() {
 
   // Banco limpo: este arquivo é destrutivo por natureza, então nunca aponte
   // TEST_DATABASE_URL para um banco com dados reais.
+  await control.query(`CREATE SCHEMA ${testSchema}`);
   const db = await initDb();
-  await db.exec(`DROP TABLE IF EXISTS entitlement_duplicates_archive, access_tokens, entitlements, orders CASCADE;`);
   await initDb();
 
   server = app.listen(0, '127.0.0.1');
@@ -180,6 +209,8 @@ async function main() {
     assert.ok(!JSON.stringify(status).toLowerCase().includes(leak), `status não pode expor ${leak}`);
   }
 
+  process.env.VIP_MEDIA_DRIVER='supabase';
+  await require('./crop-delete')(await getDb());
   console.log('PASS: Postgres — criação, duplo clique, webhook (token, divergência, idempotência),'
     + ' entitlement único, rollback atômico, VIP, expiração, formato de datas,'
     + ' cliente sem CPF em texto puro, status sem dados sensíveis');
@@ -190,4 +221,6 @@ main()
   .finally(async () => {
     if (server) await new Promise((resolve) => server.close(resolve));
     await closeDb();
+    await control.query(`DROP SCHEMA IF EXISTS ${testSchema} CASCADE`);
+    await control.end();
   });

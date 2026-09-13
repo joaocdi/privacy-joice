@@ -5,7 +5,11 @@ const cors = require('cors');
 
 const products = require('./products');
 const vipContent = require('./vip-content');
+
+const creatorProfile = require('./services/profile');
 const vipMedia = require('./services/vip-media');
+const vipPosts = require('./services/vip-posts');
+const adminAuth = require('./services/admin-auth');
 const { initDb, getDb } = require('./db/database');
 const paymentProvider = require('./payments/provider');
 const { createOrder, getOrderByPublicId, updateOrderPayment, updateOrderStatus } = require('./services/orders');
@@ -37,6 +41,7 @@ app.use(cors((req, done) => done(null, {
   }
 })));
 
+require('./admin').install(app);
 app.use(express.json({ limit: '100kb' }));
 
 /**
@@ -78,14 +83,71 @@ const accessRateLimit = rateLimit({ windowMs: 60 * 1000, max: 20 });
 
 // Serve frontend optionally
 // Explicit public allowlist: never expose backend, database, archives or private media.
+// A tela de entrada da criadora e o modo administrador embutido nas páginas
+// entram aqui de propósito: não carregam segredo nenhum, e quem decide se
+// existe sessão de admin é o backend, não estes arquivos.
 const publicFiles = ['index.html', 'app.js', 'style.css', 'avatar.jpg', 'cover.jpg', 'verified.png',
-  'vip.html', 'vip.css', 'vip.js'];
+  'vip.html', 'vip.css', 'vip.js',
+  'login.html', 'login.css', 'login.js', 'admin-mode.css', 'admin-mode.js', 'frame.js', 'frame.css'];
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, '..', 'index.html')));
 // A página VIP é pública como ARQUIVO; o conteúdo dela não. Sem assinatura
 // ativa ela não recebe feed nem mídia — só a tela de acesso negado/expirado.
 app.get('/vip', (req, res) => res.sendFile(path.join(__dirname, '..', 'vip.html')));
+app.get('/login', (req, res) => res.sendFile(path.join(__dirname, '..', 'login.html')));
 for (const file of publicFiles) app.get('/' + file, (req, res) => res.sendFile(path.join(__dirname, '..', file)));
+// Only these pre-rendered blurred derivatives are public. No private media paths.
+for (let index = 1; index <= 7; index++) {
+  const file = `post-${String(index).padStart(2, '0')}.jpg`;
+  app.get('/previews/' + file, (req, res) => res.sendFile(path.join(__dirname, '..', 'previews', file)));
+}
 app.use('/api', (req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
+/**
+ * GET /api/home/previews
+ *
+ * A amostra BLOQUEADA da página de venda, gerenciada em /admin pelo campo
+ * `show_as_preview`. Público de propósito — e por isso só devolve a derivada
+ * minúscula gerada no painel, nunca `media_path`, nunca link assinado.
+ * Sem posts marcados, devolve lista vazia e a HOME mantém as prévias estáticas.
+ */
+app.get('/api/home/previews', async (req, res) => {
+  try {
+    res.json({ previews: await vipPosts.homePreviews(), source: await vipPosts.source() });
+  } catch (error) {
+    console.error('Home previews failed:', error.name);
+    res.json({ previews: [] });
+  }
+});
+// Shared profile, including explicitly public branding images only.
+app.get('/api/profile', async (req, res, next) => {
+  try { res.json(await creatorProfile.get()); } catch (error) { next(error); }
+});
+app.get('/api/profile/media/:role', async (req, res, next) => {
+  try {
+    const image = await creatorProfile.image(req.params.role);
+    if (!image.path) return res.redirect(302, image.fallback);
+    if (vipMedia.driverName() !== 'supabase') return res.sendStatus(404);
+    await vipMedia.deliver(req, res, image.path);
+  } catch (error) { next(error); }
+});
+
+/**
+ * GET /api/contact
+ *
+ * O link do WhatsApp da Joice, montado a partir do número configurado no
+ * servidor (`WHATSAPP_NUMBER`, só dígitos com DDI). O número não fica escrito
+ * no frontend nem no repositório, e sem configuração a resposta é `null` — a
+ * página mostra o aviso de "em breve" em vez de um link quebrado.
+ *
+ * Isto NÃO é venda: nenhum pedido, cobrança ou entitlement é criado aqui, e o
+ * produto `whatsapp_unlock` continua desativado como estava.
+ */
+app.get('/api/contact', (req, res) => {
+  const digits = (process.env.WHATSAPP_NUMBER || '').replace(/\D/g, '');
+  const message = String(process.env.WHATSAPP_MESSAGE || '').slice(0, 200);
+  const valid = digits.length >= 10 && digits.length <= 15;
+  const query = valid && message ? '?text=' + encodeURIComponent(message) : '';
+  res.json({ whatsapp: valid ? `https://wa.me/${digits}${query}` : null });
+});
 app.get('/api/catalog', (req, res) => res.json({ requiresClient: paymentProvider.requiresClient, mock: paymentProvider.name === 'mock', products: Object.values(products).filter(p => p.enabled !== false).map(p => ({ id: p.id, name: p.name, price: p.price })) }));
 function bearer(req) { return /^Bearer ([a-f0-9]{64})$/.exec(req.get('authorization') || '')?.[1]; }
 function owns(req, order) { return order && matches(bearer(req), order.checkout_hash); }
@@ -101,9 +163,9 @@ async function authorizeOrder(req, res, next) {
  * Post cujo arquivo ainda não existe fica de fora — as vagas em vip-content.js
  * podem ser preenchidas aos poucos sem quebrar a página.
  */
-function buildVipFeed(orderPublicId) {
-  return vipContent.posts
-    .filter((post) => post.type === 'cta' || (!post.draft && vipMedia.exists(post.source)))
+async function buildVipFeed(orderPublicId, orderId) {
+  return (await vipPosts.feed(orderId))
+    .filter((post) => post.type === 'cta' || (!post.draft && (!post.mediaDriver || post.mediaDriver === vipMedia.driverName()) && vipMedia.exists(post.source)))
     .map((post) => (post.type === 'cta'
       ? { id: post.id, type: 'cta', variant: post.variant, title: post.title, text: post.text, button: post.button }
       : {
@@ -111,6 +173,9 @@ function buildVipFeed(orderPublicId) {
         type: post.type,
         caption: post.caption || '',
         likes: post.likes || 0,
+        crop: post.crop,
+        realLikes: Boolean(post.realLikes),
+        liked: Boolean(post.liked),
         comments: post.comments || 0,
         media: `/api/vip/media/${vipMedia.signLink(orderPublicId, post.id)}`
       }));
@@ -120,6 +185,74 @@ async function activeAccess(order) {
   if (order.status !== 'PAID') return null;
   return (await getDb()).get("SELECT * FROM entitlements WHERE order_id=? AND status='ACTIVE' AND (expires_at IS NULL OR expires_at>CURRENT_TIMESTAMP)", order.id);
 }
+/**
+ * Autorização ADMINISTRATIVA da área VIP.
+ *
+ * Existem dois caminhos independentes para ver /vip, e eles não se misturam:
+ *
+ *   comprador → pedido PAID + entitlement ACTIVE  (authorizeOrder + activeAccess)
+ *   criadora  → sessão Supabase válida + admin_users.role = 'admin'
+ *
+ * O caminho administrativo NÃO cria pedido, NÃO cria entitlement e NÃO marca
+ * pagamento nenhum: ele simplesmente não passa por `orders`. Assinante sem
+ * entitlement e visitante continuam barrados exatamente como antes, porque
+ * nenhuma das checagens acima foi afrouxada.
+ */
+async function requireAdmin(req, res, next) {
+  try {
+    req.admin = await adminAuth.session(req);
+    if (!req.admin) return res.status(403).json({ error: 'Acesso negado.' });
+    next();
+  } catch (error) { next(error); }
+}
+
+/**
+ * GET /api/vip/preview
+ *
+ * A mesma tela do assinante, montada para revisão. Precisa vir ANTES de
+ * `/api/vip/:orderId`, senão "preview" viraria um id de pedido.
+ */
+app.get('/api/vip/preview', requireAdmin, async (req, res, next) => {
+  try {
+    const feed = (await vipPosts.adminFeed())
+      .filter((post) => post.type === 'cta' || ((!post.mediaDriver || post.mediaDriver === vipMedia.driverName()) && vipMedia.exists(post.source)))
+      .map((post) => (post.type === 'cta'
+        ? { id: post.id, type: 'cta', variant: post.variant, title: post.title, text: post.text, button: post.button }
+        : {
+          id: post.id,
+          type: post.type,
+          caption: post.caption || '',
+          likes: post.likes || 0,
+          crop: post.crop,
+          realLikes: Boolean(post.realLikes),
+          liked: false,
+          draft: Boolean(post.draft),
+          comments: post.comments || 0,
+          // Sem link assinado: o cookie administrativo já viaja na requisição da
+          // mídia, e ele não serve para mais ninguém.
+          media: `/api/vip/preview/media/${encodeURIComponent(post.id)}`
+        }));
+    res.json({ granted: true, admin: true, productId: null, expiresAt: null, profile: await creatorProfile.get(), feed });
+  } catch (error) { next(error); }
+});
+
+/**
+ * GET /api/vip/preview/media/:postId
+ *
+ * Mídia protegida para a revisão administrativa. A autorização é a mesma de
+ * cima e é reconferida aqui: a sessão precisa existir E o usuário precisa
+ * continuar como admin no banco. Sem sessão, 403 — nada é entregue.
+ */
+app.get('/api/vip/preview/media/:postId', requireAdmin, async (req, res, next) => {
+  try {
+    const post = await vipPosts.findForAdmin(req.params.postId);
+    if (!post || post.type === 'cta' || !post.source || (post.mediaDriver && post.mediaDriver !== vipMedia.driverName())) {
+      return res.status(404).json({ error: 'Conteúdo não encontrado.' });
+    }
+    return await vipMedia.deliver(req, res, post.source);
+  } catch (error) { next(error); }
+});
+
 /**
  * GET /api/vip/:orderId
  *
@@ -147,8 +280,8 @@ app.get('/api/vip/:orderId', authorizeOrder, async (req, res, next) => {
       granted: true,
       productId: entitlement.product_id,
       expiresAt: entitlement.expires_at,
-      profile: vipContent.profile,
-      feed: buildVipFeed(req.order.public_id)
+      profile: await creatorProfile.get(),
+      feed: await buildVipFeed(req.order.public_id, req.order.id)
     });
   } catch (error) { next(error); }
 });
@@ -170,11 +303,21 @@ app.get('/api/vip/media/:token', async (req, res, next) => {
       return res.status(403).json({ error: 'Acesso negado.' });
     }
 
-    const post = vipContent.posts.find((item) => item.id === link.postId);
-    if (!post || post.type === 'cta' || !post.source) return res.status(404).json({ error: 'Conteúdo não encontrado.' });
+    const post = await vipPosts.findPublished(link.postId);
+    if (!post || post.type === 'cta' || !post.source || (post.mediaDriver && post.mediaDriver !== vipMedia.driverName())) return res.status(404).json({ error: 'Conteúdo não encontrado.' });
 
     return await vipMedia.deliver(req, res, post.source);
   } catch (error) { next(error); }
+});
+
+app.put('/api/vip/:orderId/posts/:postId/like', authorizeOrder, async (req, res, next) => {
+  try {
+    if (req.order.access_type !== 'vip' || !await activeAccess(req.order)) return res.status(403).json({ error: 'Acesso negado.' });
+    res.json(await vipPosts.like(req.params.postId, req.order.id, req.body.liked));
+  } catch (error) {
+    if (error.status) return res.status(error.status).json({ error: error.message });
+    next(error);
+  }
 });
 
 // GET /api/health
@@ -396,6 +539,15 @@ function ready() {
       console.log(`🖼️  Mídia VIP: driver ${vipMedia.assertConfigured()}.`);
       await initDb();
       console.log(`📦 Banco de dados inicializado (${require('./db/database').driver}).`);
+
+      // Traz o feed antigo para o banco na primeira vez, para TODA publicação
+      // ficar editável pelo painel. Roda uma vez só e nunca sobrescreve edição.
+      try {
+        const adopted = await vipPosts.adoptLegacyOnce();
+        if (adopted.switched) console.log(`📥 ${adopted.imported} publicação(ões) do feed antigo importadas para vip_posts.`);
+      } catch (error) {
+        console.warn('📥 Importação do feed antigo não concluída:', error.message);
+      }
 
       // Vagas do feed ainda sem arquivo: aparecem aqui, não quebram a página.
       const faltando = vipMedia.driverName() === 'local'

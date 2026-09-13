@@ -10,6 +10,7 @@
  * O Supabase é simulado (global.fetch trocado). Nenhuma requisição real,
  * nenhum bucket criado, nenhum upload.
  */
+require('./sqlite-env');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');

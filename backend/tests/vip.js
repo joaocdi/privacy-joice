@@ -8,6 +8,7 @@
  *
  * Provider mock, banco temporário, nenhuma cobrança.
  */
+require('./sqlite-env');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');

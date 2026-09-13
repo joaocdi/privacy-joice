@@ -4,6 +4,9 @@
  */
 
 require('dotenv').config();
+if (require('./db/database').driver !== 'sqlite' || !process.env.TEST_BASE_URL || !process.env.DATABASE_PATH?.includes('.test-runs')) {
+  throw new Error('ABORT: run this SQLite suite through npm test with an isolated database/server.');
+}
 
 // Usa a mesma porta configurada no .env, para não ficar dessincronizado.
 const BASE = process.env.TEST_BASE_URL || `http://localhost:${process.env.PORT || 3000}`;
@@ -132,8 +135,8 @@ async function runTests() {
     const fakeToken = crypto.randomBytes(16).toString('hex');
     const fakeHash = crypto.createHash('sha256').update(fakeToken).digest('hex');
     await db.run(
-      `INSERT INTO access_tokens (order_id, token_hash, expires_at) VALUES (1, ?, datetime('now', '-1 hour'))`,
-      [fakeHash]
+      `INSERT INTO access_tokens (order_id, token_hash, expires_at) VALUES ((SELECT id FROM orders WHERE public_id=?), ?, datetime('now', '-1 hour'))`,
+      [orderId, fakeHash]
     );
     const { validateAndConsumeToken } = require('./services/access-tokens');
     const result = await validateAndConsumeToken(fakeToken, '999999');
@@ -149,8 +152,8 @@ async function runTests() {
     const fakeToken = crypto.randomBytes(16).toString('hex');
     const fakeHash = crypto.createHash('sha256').update(fakeToken).digest('hex');
     await db.run(
-      `INSERT INTO access_tokens (order_id, token_hash, telegram_user_id, used_at, expires_at) VALUES (1, ?, '111111', CURRENT_TIMESTAMP, datetime('now', '+1 hour'))`,
-      [fakeHash]
+      `INSERT INTO access_tokens (order_id, token_hash, telegram_user_id, used_at, expires_at) VALUES ((SELECT id FROM orders WHERE public_id=?), ?, '111111', CURRENT_TIMESTAMP, datetime('now', '+1 hour'))`,
+      [orderId, fakeHash]
     );
     const { validateAndConsumeToken } = require('./services/access-tokens');
     const result = await validateAndConsumeToken(fakeToken, '222222');

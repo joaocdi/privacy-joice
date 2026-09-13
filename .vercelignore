@@ -6,6 +6,7 @@ Midias_Bloqueadas/
 Privacy_Sites.zip
 backend/.test-runs/
 backend/tests/
+backend/scripts/
 *.sqlite
 *.sqlite-*
 .env
