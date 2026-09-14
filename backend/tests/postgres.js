@@ -225,6 +225,7 @@ async function main() {
   console.log('PASS real PostgreSQL likes: count, duplicate like/unlike, persisted state, COUNT string zero');
   process.env.VIP_MEDIA_SECRET = crypto.randomBytes(32).toString('hex');
   await require('./buyer-recovery')(await getDb());
+  await require('./grant-scope')();
   console.log('PASS: Postgres — criação, duplo clique, webhook (token, divergência, idempotência),'
     + ' entitlement único, rollback atômico, VIP, expiração, formato de datas,'
     + ' cliente sem CPF em texto puro, status sem dados sensíveis');

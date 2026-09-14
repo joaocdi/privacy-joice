@@ -131,6 +131,7 @@ async function main() {
   console.log('PASS: concurrency, rollback, webhook validation/idempotency, authorization, expiry, price and persistence');
   await child('tests/provider.js');
   await child('tests/isolation.js');
+  await child('tests/vercel-safety.js');
   await child('tests/migration.js');
   await child('tests/persistence.js');
   await child('tests/vip.js');
@@ -138,6 +139,7 @@ async function main() {
   await child('tests/admin.js');
   await child('tests/likes.js');
   await child('tests/buyer-recovery.js');
+  await child('tests/grant-scope.js');
   await child('tests/admin-mode.js');
   await child('tests/crop-delete.js');
   await child('tests/preview-video.js');

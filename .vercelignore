@@ -11,6 +11,8 @@ backend/scripts/
 *.sqlite-*
 .env
 .env.*
+backend.env
+_snapshots/
 !.env.example
 
 # Fontes de referência capturadas do site original: não fazem parte do produto.

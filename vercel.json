@@ -1,17 +1,19 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
+  "outputDirectory": "public",
+  "buildCommand": "node -e \"const fs=require('fs');fs.mkdirSync('public',{recursive:true});fs.copyFileSync('verified.png','public/verified.png')\"",
   "installCommand": "npm ci --prefix backend --omit=dev --omit=optional",
   "functions": {
     "api/index.js": {
       "maxDuration": 30,
-      "includeFiles": "{index.html,app.js,style.css,vip.html,vip.css,vip.js,avatar.jpg,cover.jpg,verified.png,frame.js,frame.css,admin-mode.js,admin-mode.css,login.html,login.js,login.css,previews/*.jpg,backend/**}"
+      "includeFiles": "{index.html,app.js,style.css,vip.html,vip.css,vip.js,avatar.jpg,cover.jpg,verified.png,frame.js,frame.css,carousel.js,carousel.css,admin-mode.js,admin-mode.css,admin-loader.js,login.html,login.js,login.css,previews/*.jpg,backend/**}"
     }
   },
   "rewrites": [
     { "source": "/(.*)", "destination": "/api/index" }
   ],
   "crons": [
-    { "path": "/api/jobs/expire", "schedule": "0 * * * *" }
+    { "path": "/api/jobs/expire", "schedule": "0 3 * * *" }
   ]
 }

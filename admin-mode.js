@@ -834,9 +834,12 @@
   async function start() {
     let me;
     try {
-      const response = await fetch(BASE + '/api/admin/me', { signal: AbortSignal.timeout(8000) });
-      if (!response.ok) return;
-      me = await response.json();
+      if (window.JoiceAdminSession) me = await window.JoiceAdminSession;
+      else {
+        const response = await fetch(BASE + '/api/admin/me', { signal: AbortSignal.timeout(8000) });
+        if (!response.ok) return;
+        me = await response.json();
+      }
     } catch (_) { return; }            // sem backend, a página fica como está
     if (!me || !me.admin) return;      // visitante e assinante: nada é desenhado
 

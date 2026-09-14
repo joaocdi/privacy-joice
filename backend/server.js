@@ -90,7 +90,7 @@ const accessRateLimit = rateLimit({ windowMs: 60 * 1000, max: 20 });
 // existe sessão de admin é o backend, não estes arquivos.
 const publicFiles = ['index.html', 'app.js', 'style.css', 'avatar.jpg', 'cover.jpg', 'verified.png',
   'vip.html', 'vip.css', 'vip.js',
-  'login.html', 'login.css', 'login.js', 'admin-mode.css', 'admin-mode.js', 'frame.js', 'frame.css', 'carousel.js', 'carousel.css'];
+  'login.html', 'login.css', 'login.js', 'admin-mode.css', 'admin-mode.js', 'admin-loader.js', 'frame.js', 'frame.css', 'carousel.js', 'carousel.css'];
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, '..', 'index.html')));
 // A página VIP é pública como ARQUIVO; o conteúdo dela não. Sem assinatura
 // ativa ela não recebe feed nem mídia — só a tela de acesso negado/expirado.
@@ -239,8 +239,7 @@ function carouselFor(post, link) {
 }
 
 async function activeAccess(order) {
-  if (order.status !== 'PAID') return null;
-  return (await getDb()).get("SELECT * FROM entitlements WHERE order_id=? AND status='ACTIVE' AND (expires_at IS NULL OR expires_at>CURRENT_TIMESTAMP)", order.id);
+  return require('./services/entitlements').activeSubscription(order);
 }
 /**
  * Autorização ADMINISTRATIVA da área VIP.
@@ -534,7 +533,7 @@ app.get('/api/access/:orderId', accessRateLimit, authorizeOrder, async (req, res
 });
 
 // DEV ROUTE: Simular pagamento
-if (process.env.NODE_ENV !== 'production' && paymentProvider.name === 'mock') {
+if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL && paymentProvider.name === 'mock') {
   app.post('/api/dev/orders/:orderId/pay', authorizeOrder, async (req, res) => {
     try {
       const { orderId } = req.params;

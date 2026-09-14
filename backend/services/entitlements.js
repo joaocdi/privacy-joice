@@ -3,14 +3,18 @@ const products = require('../products');
 
 async function insertEntitlement(db, order) {
   if (order.status !== 'PAID') throw new Error('Order must be paid');
-  const days = order.access_days || products[order.product_id]?.accessDays || null;
-  await db.run(`INSERT INTO entitlements (order_id, product_id, starts_at, expires_at, status)
-    VALUES (?, ?, ?, CASE WHEN ? IS NULL THEN NULL ELSE datetime(?, ?) END, 'ACTIVE')
+  const type = order.grant_type;
+  if (!['subscription','ppv','contact'].includes(type)) throw new Error('Invalid grant type');
+  if (type === 'ppv' && (!order.resource_type || !order.resource_id || order.access_type !== 'ppv')) throw new Error('Invalid PPV scope');
+  const days = type === 'subscription' ? order.access_days || products[order.product_id]?.accessDays || null : null;
+  await db.run(`INSERT INTO entitlements (order_id, product_id, starts_at, expires_at, status, grant_type, resource_type, resource_id)
+    VALUES (?, ?, ?, CASE WHEN ? IS NULL THEN NULL ELSE datetime(?, ?) END, 'ACTIVE', ?, ?, ?)
     ON CONFLICT(order_id) DO NOTHING`,
     // Acesso vitalício (produto avulso) não tem intervalo: mandamos NULL em vez
     // de montar "+null days". O SQLite nem avaliava esse ramo do CASE; o
     // Postgres converte o parâmetro antes e recusaria a cobrança.
-    order.id, order.product_id, order.paid_at, days, order.paid_at, days ? '+' + days + ' days' : null);
+    order.id, order.product_id, order.paid_at, days, order.paid_at, days ? '+' + days + ' days' : null,
+    type, type === 'ppv' ? order.resource_type : null, type === 'ppv' ? order.resource_id : null);
   return db.get('SELECT * FROM entitlements WHERE order_id=?', order.id);
 }
 async function createOrUpdateEntitlement(orderId, productId) {
@@ -37,6 +41,7 @@ async function getActiveEntitlementByTelegramUserId(telegramUserId) {
         SELECT * FROM entitlements 
         WHERE telegram_user_id = ? 
         AND status = 'ACTIVE' 
+        AND grant_type = 'subscription'
         AND expires_at > CURRENT_TIMESTAMP
         ORDER BY expires_at DESC LIMIT 1
     `, [telegramUserId]);
@@ -61,6 +66,8 @@ async function expireEntitlement(id) {
 }
 
 module.exports = {
+  activeSubscription,
+  hasResourceAccess,
   createOrUpdateEntitlement,
   confirmPayment,
   getActiveEntitlementByTelegramUserId,
@@ -68,3 +75,14 @@ module.exports = {
   getExpiredEntitlements,
   expireEntitlement
 };
+
+async function activeSubscription(order) {
+  if (!order || order.status !== 'PAID' || order.access_type !== 'vip' || order.grant_type !== 'subscription') return null;
+  return (await getDb()).get("SELECT * FROM entitlements WHERE order_id=? AND grant_type='subscription' AND resource_type IS NULL AND resource_id IS NULL AND status='ACTIVE' AND (expires_at IS NULL OR expires_at>CURRENT_TIMESTAMP)", order.id);
+}
+
+// Internal authorization primitive for future resource endpoints, after ownership.
+async function hasResourceAccess(order, resourceType, resourceId) {
+  if (!order || order.status !== 'PAID' || order.access_type !== 'ppv' || order.grant_type !== 'ppv' || order.resource_type !== resourceType || order.resource_id !== String(resourceId)) return false;
+  return Boolean(await (await getDb()).get("SELECT id FROM entitlements WHERE order_id=? AND grant_type='ppv' AND resource_type=? AND resource_id=? AND status='ACTIVE' AND (expires_at IS NULL OR expires_at>CURRENT_TIMESTAMP)", order.id, resourceType, String(resourceId)));
+}

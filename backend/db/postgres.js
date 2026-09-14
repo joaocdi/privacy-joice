@@ -181,6 +181,7 @@ async function initDb() {
   for (const table of ['media_deletions', 'creator_profiles', 'vip_posts', 'vip_post_media', 'vip_content_settings', 'vip_post_likes', 'admin_sessions', 'admin_login_limits', 'vip_uploads', 'admin_users']) {
     await getPool().query(`ALTER TABLE ${table} ENABLE ROW LEVEL SECURITY`);
   }
+  await require('./grant-migrations').migrate(await getDb(), true);
   return getDb();
 }
 

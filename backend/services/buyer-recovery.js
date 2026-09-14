@@ -45,7 +45,7 @@ function create(provider=unavailable){return {
    const consumed = await db.run('UPDATE buyer_recovery SET used=1 WHERE id=? AND used=0',id);
    if (!consumed.changes) return {error:400};
    // Only after proof of phone possession do we look up a paid, active grant.
-   const order=await db.get("SELECT o.id,o.public_id FROM orders o JOIN entitlements e ON e.order_id=o.id WHERE o.customer_phone IN (?,?) AND o.status='PAID' AND o.access_type='vip' AND e.status='ACTIVE' AND (e.expires_at IS NULL OR e.expires_at>CURRENT_TIMESTAMP) ORDER BY o.created_at DESC,o.id DESC LIMIT 1",row.phone,row.phone.slice(2));
+   const order=await db.get("SELECT o.id,o.public_id FROM orders o JOIN entitlements e ON e.order_id=o.id WHERE o.customer_phone IN (?,?) AND o.status='PAID' AND o.access_type='vip' AND o.grant_type='subscription' AND e.grant_type='subscription' AND e.resource_type IS NULL AND e.resource_id IS NULL AND e.status='ACTIVE' AND (e.expires_at IS NULL OR e.expires_at>CURRENT_TIMESTAMP) ORDER BY o.created_at DESC,o.id DESC LIMIT 1",row.phone,row.phone.slice(2));
    if(!order)return {error:400};
    const token=crypto.randomBytes(32).toString('hex');
    await db.run('INSERT INTO buyer_sessions(id,order_id,token_hash,expires_at) VALUES (?,?,?,?)',crypto.randomUUID(),order.id,hash(token),Date.now()+180*86400000);

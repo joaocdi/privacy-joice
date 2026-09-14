@@ -9,7 +9,7 @@ const {chromium}=require('../.test-runs/browser/node_modules/playwright');let se
 async function main(){
  await database.initDb();server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));const base='http://127.0.0.1:'+server.address().port,db=await database.getDb();
  browser=await chromium.launch({headless:true,executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe'});
- for(const width of [320,375,390,430]){
+ for(const width of [320,375,390,430,768,1280]){
   const context=await browser.newContext({viewport:{width,height:850},hasTouch:true,permissions:['clipboard-read','clipboard-write']});const page=await context.newPage();
   await page.goto(base+'/');await page.evaluate(()=>openCheckout('monthly'));
   const phone=page.locator('#checkoutClientForm input[name="phone"]');await phone.waitFor({state:'visible'});

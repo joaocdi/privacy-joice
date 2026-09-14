@@ -7,7 +7,6 @@
  * Agora usamos a classe `Bot`, middlewares (`bot.command`), o `Context` (ctx)
  * e as chamadas de API em `bot.api.*` recebendo um objeto de parâmetros.
  */
-const { Bot } = require('node-telegram-bot-api');
 const { validateAndConsumeToken } = require('../services/access-tokens');
 const { getDb } = require('../db/database');
 const { linkEntitlementToTelegram } = require('../services/entitlements');
@@ -23,6 +22,7 @@ function initBot() {
     return null;
   }
 
+  const { Bot } = require('node-telegram-bot-api');
   bot = new Bot(token);
 
   bot.command('start', async (ctx) => {

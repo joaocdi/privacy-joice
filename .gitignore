@@ -25,3 +25,9 @@ Privacy_Sites.zip
 clone.html
 site_source.html
 routes_bundle.js
+
+.vercel
+.env*
+/backend.env
+/_snapshots/
+/public/

@@ -23,6 +23,11 @@ function customerColumns(client) {
 }
 
 async function createOrder(product, checkoutToken, provider, client = null) {
+  // Catalog/server metadata only; no resource or grant scope comes from checkout.
+  const grantType = product.type === 'ppv' ? 'ppv' : product.type === 'one_time' ? 'contact' : 'subscription';
+  const resourceType = grantType === 'ppv' ? product.resourceType : null;
+  const resourceId = grantType === 'ppv' && product.resourceId != null ? String(product.resourceId) : null;
+  if (grantType === 'ppv' && (!['post', 'pack', 'video'].includes(resourceType) || !resourceId || resourceId.length > 200 || product.accessDays)) throw new Error('Invalid PPV resource');
   return transaction(async db => {
     const checkoutHash = hash(checkoutToken);
     const existing = await db.get('SELECT * FROM orders WHERE checkout_hash = ?', checkoutHash);
@@ -36,9 +41,9 @@ async function createOrder(product, checkoutToken, provider, client = null) {
     // isto, o duplo clique virava violação de índice e um 502 na cara do
     // cliente. Quem perde a corrida apenas reaproveita o pedido do outro.
     const customer = customerColumns(client);
-    const inserted = await db.run("INSERT INTO orders (public_id, product_id, amount, status, payment_provider, checkout_hash, access_days, access_type, customer_name, customer_email, customer_phone, customer_document_hash, customer_document_last3, expires_at) VALUES (?, ?, ?, 'CREATING', ?, ?, ?, ?, ?, ?, ?, ?, ?, CASE WHEN ?='mock' THEN datetime('now', '+30 minutes') ELSE NULL END) ON CONFLICT(checkout_hash) DO NOTHING",
-      id, product.id, product.price, provider, checkoutHash, product.accessDays || null, product.type === 'one_time' ? 'whatsapp' : 'vip',
-      customer.name, customer.email, customer.phone, customer.documentHash, customer.documentLast3, provider);
+    const inserted = await db.run("INSERT INTO orders (public_id, product_id, amount, status, payment_provider, checkout_hash, access_days, access_type, customer_name, customer_email, customer_phone, customer_document_hash, customer_document_last3, expires_at, grant_type, resource_type, resource_id) VALUES (?, ?, ?, 'CREATING', ?, ?, ?, ?, ?, ?, ?, ?, ?, CASE WHEN ?='mock' THEN datetime('now', '+30 minutes') ELSE NULL END, ?, ?, ?) ON CONFLICT(checkout_hash) DO NOTHING",
+      id, product.id, product.price, provider, checkoutHash, product.accessDays || null, grantType === 'ppv' ? 'ppv' : grantType === 'contact' ? 'whatsapp' : 'vip',
+      customer.name, customer.email, customer.phone, customer.documentHash, customer.documentLast3, provider, grantType, resourceType, resourceId);
     if (!inserted.changes) {
       const raced = await db.get('SELECT * FROM orders WHERE checkout_hash = ?', checkoutHash);
       if (!raced) throw new Error('Checkout não persistido.');

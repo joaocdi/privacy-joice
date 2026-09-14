@@ -141,7 +141,7 @@ check('allowlist de arquivos estáticos encontrada', Boolean(allowlist));
 if (allowlist) {
   const lista = allowlist[1].split(',').map((item) => item.trim().replace(/['"]/g, '')).filter(Boolean);
   check('allowlist só tem página, script, estilo e imagem de perfil',
-    lista.every((item) => /^(index\.html|app\.js|style\.css|vip\.(html|css|js)|avatar\.jpg|cover\.jpg|verified\.png|login\.(html|css|js)|admin-mode\.(css|js)|frame\.(css|js)|carousel\.(css|js))$/.test(item)),
+    lista.every((item) => /^(index\.html|app\.js|style\.css|vip\.(html|css|js)|avatar\.jpg|cover\.jpg|verified\.png|login\.(html|css|js)|admin-mode\.(css|js)|admin-loader\.js|frame\.(css|js)|carousel\.(css|js))$/.test(item)),
     lista.join(' '));
 }
 
@@ -205,7 +205,7 @@ check('rota dev não existe sem ALLOW_DEV_PAYMENTS',
   || serverJs.includes("process.env.NODE_ENV !== 'production'"),
   'protegida por NODE_ENV e provider mock');
 check('rota dev exige provider mock e fora de produção',
-  /NODE_ENV !== 'production' && paymentProvider\.name === 'mock'/.test(serverJs));
+  /NODE_ENV !== 'production' && !process\.env\.VERCEL && paymentProvider\.name === 'mock'/.test(serverJs));
 check('rota dev exige o segredo do checkout (authorizeOrder)',
   /app\.post\('\/api\/dev\/orders\/:orderId\/pay', authorizeOrder/.test(serverJs));
 check('cron de expiração exige CRON_SECRET',
@@ -238,9 +238,11 @@ check('a revisão administrativa não cria pedido, entitlement nem marca pagamen
   'o caminho da criadora não passa por orders nem por entitlements');
 check('a revisão administrativa não assina link de comprador',
   previewRoutes.length > 0 && !/signLink|authorizeOrder|activeAccess/.test(previewRoutes));
-check('o caminho do comprador continua exigindo PAID e entitlement ativo',
-  /if \(order\.status !== 'PAID'\) return null/.test(serverJs)
-  && /status='ACTIVE'/.test(serverJs));
+const grantService = fs.readFileSync(path.join(BACKEND, 'services', 'entitlements.js'), 'utf8');
+check('o caminho do comprador continua exigindo PAID e entitlement ativo de assinatura',
+  /return require\('\.\/services\/entitlements'\)\.activeSubscription\(order\)/.test(serverJs)
+  && /order\.status !== 'PAID'.*order\.access_type !== 'vip'.*order\.grant_type !== 'subscription'/.test(grantService)
+  && /grant_type='subscription'.*status='ACTIVE'.*expires_at>CURRENT_TIMESTAMP/.test(grantService));
 
 const vipMediaJs = fs.readFileSync(path.join(BACKEND, 'services', 'vip-media.js'), 'utf8');
 check('signed URL do Supabase tem expiração', /expiresIn: signedUrlTtl\(\)/.test(vipMediaJs));

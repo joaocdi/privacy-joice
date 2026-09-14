@@ -31,6 +31,7 @@ async function main() {
   const db = await dbService.getDb();
   process.env.VIP_MEDIA_SECRET = crypto.randomBytes(32).toString('hex');
   await require('./buyer-recovery')(db);
+  await require('./grant-scope')();
   await require('./profile-contract')(db);
   const now = Date.now();
   await db.run("INSERT INTO orders(public_id,product_id,amount) VALUES ('pg-cms-order','monthly',9.9)");

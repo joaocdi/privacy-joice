@@ -71,8 +71,8 @@ async function initDb() {
   await db.exec(`BEGIN IMMEDIATE;
     CREATE TABLE IF NOT EXISTS entitlement_duplicates_archive AS
       SELECT *, CURRENT_TIMESTAMP AS archived_at FROM entitlements WHERE 0;
-    INSERT INTO entitlement_duplicates_archive
-      SELECT e.*, CURRENT_TIMESTAMP FROM entitlements e
+    INSERT INTO entitlement_duplicates_archive (id,order_id,telegram_user_id,product_id,starts_at,expires_at,status,created_at,archived_at)
+      SELECT e.id,e.order_id,e.telegram_user_id,e.product_id,e.starts_at,e.expires_at,e.status,e.created_at,CURRENT_TIMESTAMP FROM entitlements e
       WHERE e.status='EXPIRED' AND EXISTS (
         SELECT 1 FROM entitlements keep WHERE keep.order_id=e.order_id AND keep.status='ACTIVE');
     DELETE FROM entitlements WHERE id IN (SELECT id FROM entitlement_duplicates_archive);
@@ -81,6 +81,7 @@ async function initDb() {
     CREATE UNIQUE INDEX IF NOT EXISTS webhook_token_unique ON orders(webhook_token_hash);
     CREATE UNIQUE INDEX IF NOT EXISTS checkout_hash_unique ON orders(checkout_hash);
     CREATE UNIQUE INDEX IF NOT EXISTS provider_payment_unique ON orders(payment_provider, provider_payment_id);`);
+  await require('./grant-migrations').migrate(db);
   return db;
 }
 
