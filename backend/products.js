@@ -1,7 +1,7 @@
-const whatsappPrice = Number(process.env.WHATSAPP_PRICE || '8.90');
+const whatsappPrice = Number(process.env.WHATSAPP_PRICE || '7.90');
 if (!Number.isFinite(whatsappPrice) || whatsappPrice <= 0 || Math.round(whatsappPrice * 100) / 100 !== whatsappPrice) throw new Error('Invalid WHATSAPP_PRICE');
 const products = {
-  whatsapp_unlock: { id: 'whatsapp_unlock', name: 'Contato privado', price: whatsappPrice, type: 'one_time', enabled: false },
+  whatsapp_unlock: { id: 'whatsapp_unlock', name: 'Contato privado', price: whatsappPrice, type: 'one_time', get enabled() { return /^\d{10,15}$/.test((process.env.WHATSAPP_NUMBER || '').replace(/\D/g, '')); } },
   monthly: {
     id: "monthly",
     name: "1 mês",
@@ -19,7 +19,7 @@ const products = {
   semester: {
     id: "semester",
     name: "6 meses",
-    price: 39.90,
+    price: 29.90,
     accessDays: 180
   }
 };
