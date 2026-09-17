@@ -35,7 +35,7 @@ routes_bundle.js
 .env*
 
 # Atalho local de publicacao
-publicar.bat
+*.bat
 node_modules/
 .vercel/
 .audit/
