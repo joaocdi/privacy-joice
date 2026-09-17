@@ -1,3 +1,33 @@
+// Confirmação de idade por sessão; não concede acesso ao conteúdo VIP.
+let resolveAgeReady;
+window.ageReady = new Promise(resolve => { resolveAgeReady = resolve; });
+(function ageConfirmation() {
+  const gate = document.getElementById('ageGate');
+  let entered = false;
+  function enter() {
+    if (entered) return;
+    entered = true;
+    gate.hidden = true;
+    document.body.classList.remove('age-pending');
+    resolveAgeReady();
+  }
+  let confirmed = false;
+  try { confirmed = sessionStorage.getItem('joice.age.confirmed') === 'yes'; } catch (_) {}
+  if (confirmed) enter();
+  else document.getElementById('ageConfirm').focus();
+  document.getElementById('ageConfirm').addEventListener('click', () => {
+    try { sessionStorage.setItem('joice.age.confirmed', 'yes'); } catch (_) {}
+    enter(); document.querySelector('.logo-text')?.focus();
+  });
+  document.getElementById('ageExit').addEventListener('click', () => window.location.replace('about:blank'));
+  gate.addEventListener('keydown', event => {
+    if (event.key !== 'Tab') return;
+    const first = document.getElementById('ageConfirm'), last = document.getElementById('ageExit');
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+  });
+})();
+
 /* ===========================
    DATA: Creator & Content
    =========================== */
@@ -6,8 +36,8 @@
 
 const plans = [
   { id: "monthly",     label: "Assinatura mensal",      price: "R$ 9,90",  displayBtn: "Assinar agora R$ 9,90" },
-  { id: "quarterly",   label: "3 meses (50% off)",       price: "R$ 19,90" },
-  { id: "semester",    label: "6 meses (50% off)",       price: "R$ 39,90" }
+  { id: "quarterly",   label: "3 meses",       price: "R$ 19,90" },
+  { id: "semester",    label: "6 meses",       price: "R$ 29,90" }
 ];
 
 // Viewer count – to be replaced by backend value
@@ -19,6 +49,31 @@ const offerExpiresAt = null; // e.g. new Date(Date.now() + 57000)
 /* ===========================
    INIT: Populate DOM from data
    =========================== */
+/**
+ * Número curto para os contadores do perfil: 999, 1K, 5.2K, 27K, 27.4K, 1M.
+ *
+ * Abaixo de mil mostra o número inteiro. Acima, corta em mil/milhão com uma
+ * casa decimal só quando ela existe, para o valor caber no celular de 320px
+ * sem quebrar a linha de estatísticas.
+ */
+function compactNumber(value) {
+  const texto = String(value ?? '').trim();
+  // Valor já escrito à mão ("12,8 mil"): respeita como está.
+  if (/[a-zA-Z]/.test(texto)) return texto;
+  const number = Number(texto.replace(/[^0-9.-]/g, ''));
+  if (!Number.isFinite(number)) return String(value ?? '');
+  const sign = number < 0 ? '-' : '';
+  const abs = Math.abs(number);
+  if (abs < 1000) return sign + String(Math.round(abs));
+  for (const [limit, suffix] of [[1e9, 'B'], [1e6, 'M'], [1e3, 'K']]) {
+    if (abs < limit) continue;
+    const scaled = abs / limit;
+    const rounded = scaled >= 100 ? Math.round(scaled) : Math.round(scaled * 10) / 10;
+    return sign + String(rounded).replace('.', ',') + suffix;
+  }
+  return sign + String(Math.round(abs));
+}
+
 function applyProfile(profile) {
   const text = (id, value) => { const el = document.getElementById(id); if (el && value != null) el.textContent = value; };
   text('profileName', profile.name);
@@ -34,12 +89,13 @@ function applyProfile(profile) {
 
   const stats = profile.stats;
   if (stats) {
-    text('statPhotos', stats.photos);
-    text('statVideos', stats.videos);
-    text('statLikes', stats.likes);
-    // As abas repetem os mesmos números: mídias é a soma de fotos e vídeos.
+    text('statPhotos', compactNumber(stats.photos));
+    text('statVideos', compactNumber(stats.videos));
+    text('statLikes', compactNumber(stats.likes));
+    text('statLocked', compactNumber(stats.posts));
+    // Contagens de apresentação solicitadas; não alteram registros de conteúdo.
     text('tabPostsLabel', `${stats.posts} Postagens`);
-    text('tabMediaLabel', `${Number(stats.photos || 0) + Number(stats.videos || 0)} Mídias`);
+    text('tabMediaLabel', `${Number(stats.photos) + Number(stats.videos)} Mídias`);
   }
 
   const location = document.getElementById('profileLocation');
@@ -85,33 +141,32 @@ const HOME_CAPTIONS = [
  * este navegador — nem por link assinado, nem por caminho de Storage.
  *
  * O que esta função faz é só o comportamento de tela:
- *   toca sem som → congela no limite → mostra o convite para assinar.
+ *   toca a derivada sem som em loop enquanto estiver visível.
  *
  * `preload="metadata"` de propósito: no celular, nada de baixar o arquivo
  * inteiro antes da pessoa olhar para ele.
  */
 function mountTeaser(locked, { src, seconds, poster, overlay }) {
-  const limit = Number(seconds) > 0 ? Number(seconds) : 3;
   // O convite do teaser fala do vídeo, não de "este conteúdo" genérico.
   if (overlay) {
     const title = overlay.querySelector('.locked-text');
     if (title) {
-      title.textContent = 'Continue assistindo';
-      const note = document.createElement('span');
-      note.className = 'locked-subtext';
-      note.textContent = 'Assine para desbloquear o vídeo completo';
-      title.after(note);
+      title.textContent = 'Conteúdo exclusivo';
+
     }
   }
   const video = document.createElement('video');
   video.className = 'locked-video';
-  video.src = src;
+  video.dataset.teaserSrc = src;
   video.muted = true; video.defaultMuted = true; video.volume = 0;
   video.playsInline = true;
   video.setAttribute('muted', '');
   video.setAttribute('playsinline', '');
   video.setAttribute('webkit-playsinline', '');
-  video.preload = 'metadata';
+  video.preload = 'none';
+  // Uma passada só: a prévia vai até o limite e o cartão volta ao estado
+  // bloqueado (pôster desfocado + convite). Nada de loop infinito consumindo
+  // bateria e dados enquanto a pessoa lê o resto da página.
   video.loop = false;
   video.controls = false;
   video.disablePictureInPicture = true;
@@ -121,42 +176,51 @@ function mountTeaser(locked, { src, seconds, poster, overlay }) {
   const replay = document.createElement('button');
   replay.type = 'button';
   replay.className = 'locked-replay';
-  replay.hidden = true;
+  replay.textContent = '▶ Ver prévia';
+  replay.setAttribute('aria-label', 'Reproduzir prévia do vídeo');
 
-  // Congelar é o ponto: o quadro parado continua na tela sob o convite.
-  let frozen = false;
-  const freeze = () => {
-    if (frozen) return;
-    frozen = true;
-    video.pause();
-    locked.classList.add('is-teaser-done');
-    replay.hidden = false;
-    replay.textContent = 'Ver de novo';
-  };
-  video.addEventListener('timeupdate', () => { if (video.currentTime >= limit) freeze(); });
-  video.addEventListener('ended', freeze);
-  // Nem arrastando a barra: não há barra, e qualquer salto além do limite volta.
-  video.addEventListener('seeking', () => { if (video.currentTime > limit) video.currentTime = limit; });
-
+  // Only the already blurred, silent derivative plays; originals stay private.
+  let visible = false;
+  let finished = false;
+  // Trava do lado do cliente, além da duração do próprio arquivo derivado.
+  const limit = Number(seconds) > 0 ? Number(seconds) : 7;
   const play = () => {
-    frozen = false;
-    locked.classList.remove('is-teaser-done', 'is-teaser-paused');
-    replay.hidden = true;
-    video.currentTime = 0;
-    // Sempre o mesmo arquivo derivado: "ver de novo" não desbloqueia nada.
-    return video.play();
+    if (!video.getAttribute('src')) video.src = video.dataset.teaserSrc;
+    return video.play().then(() => { replay.hidden = true; }).catch(() => { replay.hidden = false; });
   };
-  replay.addEventListener('click', event => { event.stopPropagation(); play(); });
-
-  // Autoplay bloqueado (iOS com economia de bateria, Data Saver) não pode virar
-  // um retângulo preto: fica o pôster desfocado e um botão de play.
-  video.addEventListener('loadedmetadata', () => {
-    video.play().catch(() => {
-      locked.classList.add('is-teaser-paused');
-      replay.hidden = false;
-      replay.textContent = '▶ Ver prévia';
-    });
-  }, { once: true });
+  // Fim da prévia: volta ao cartão bloqueado, com o convite de rever.
+  const finish = () => {
+    finished = true;
+    video.pause();
+    try { video.currentTime = 0; } catch (_) { /* alguns navegadores recusam */ }
+    locked.classList.remove('teaser-ready');
+    replay.hidden = false;
+  };
+  video.addEventListener('timeupdate', () => { if (video.currentTime >= limit) finish(); });
+  video.addEventListener('ended', finish);
+  replay.addEventListener('click', event => { event.stopPropagation(); finished = false; play(); });
+  video.addEventListener('loadeddata', () => { locked.classList.add('teaser-ready'); });
+  video.addEventListener('playing', () => { locked.classList.add('teaser-ready'); replay.hidden = true; });
+  video.addEventListener('error', () => { locked.classList.remove('teaser-ready'); replay.hidden = false; });
+  // Fetch the small derivative shortly before arrival, without playing offscreen.
+  const warmup = new IntersectionObserver(entries => {
+    if (entries.some(entry => entry.isIntersecting)) {
+      if (!video.getAttribute('src')) { video.preload = 'auto'; video.src = video.dataset.teaserSrc; video.load(); }
+      warmup.disconnect();
+    }
+  }, { rootMargin: '450px 0px' });
+  warmup.observe(video);
+  const resume = () => {
+    if (finished) { video.pause(); return; }
+    if (visible && !document.hidden && !document.body.classList.contains('age-pending')) play();
+    else video.pause();
+  };
+  const observer = new IntersectionObserver(entries => {
+    for (const entry of entries) { visible = entry.isIntersecting && entry.intersectionRatio >= .25; resume(); }
+  }, { threshold: [0, .25] });
+  observer.observe(video);
+  document.addEventListener('visibilitychange', resume);
+  document.getElementById('ageConfirm')?.addEventListener('click', resume, { once: true });
 
   // O vídeo entra ATRÁS do véu e do convite; o botão de rever, na frente.
   if (overlay && overlay.parentNode === locked) locked.insertBefore(video, overlay);
@@ -201,11 +265,11 @@ function mountLockedCarousel(locked, overlay, items, teaserSeconds) {
     image.loading = index === 0 ? 'eager' : 'lazy';
     image.width = 64; image.height = 80;
     cell.append(image);
-    JoiceFrame.apply(image, item.crop, { box: cell });
+    JoiceFrame.apply(image, item.crop, { box: cell, preview: true });
     if (item.type === 'video' && typeof item.teaser === 'string' && item.teaser.startsWith('/api/home/preview-video/')) {
       cell.classList.add('has-teaser');
       const video = mountTeaser(cell, { src: API_BASE + item.teaser, seconds: teaserSeconds, poster: item.preview, overlay: null });
-      JoiceFrame.apply(video, item.crop, { box: cell });
+      JoiceFrame.apply(video, item.crop, { box: cell, preview: true });
     }
   }), {
     onEnter: video => { video.play?.().catch(() => {}); }
@@ -228,10 +292,29 @@ function decorateLockedPost(post, { type, caption, id, likes_count }) {
   // Sem etiqueta de FOTO/VÍDEO e sem faixa sobre a mídia: o feed fica limpo.
   head.querySelector('.post-menu')?.remove();
   article.append(captionEl, post);
+  const actions = document.createElement('div');
+  actions.className = 'preview-actions';
+  const shapes = [
+    'M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 1 0-7.8 7.8L12 21.2l8.8-8.8a5.5 5.5 0 0 0 0-7.8z',
+    'M21 11.5a9 9 0 0 1-9 9 10 10 0 0 1-4-.9L3 21l1.4-4.8A9 9 0 1 1 21 11.5z',
+    'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z M15 8.5c-1-1-5-1.5-5 1s5 1 5 4c0 2.5-4 2.5-6 1 M12 6v12'
+  ];
+  ['Curtidas disponíveis no VIP', 'Comentários indisponíveis'].forEach((label, index) => {
+    const control = document.createElement('button');
+    control.type = 'button'; control.className = 'preview-action';
+    control.title = label; control.setAttribute('aria-label', label);
+    control.disabled = index < 2;
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('aria-hidden', 'true');
+    const shape = document.createElementNS(svg.namespaceURI, 'path');
+    shape.setAttribute('d', shapes[index]); svg.append(shape); control.append(svg);
+    actions.append(control);
+  });
+  article.append(actions);
   const footer = document.createElement('div');
   footer.className = 'preview-engagement';
   const left = document.createElement('span');
-  left.textContent = Number.isFinite(likes_count) ? '♡ ' + likes_count.toLocaleString('pt-BR') : 'Conteúdo exclusivo';
+  left.textContent = Number.isFinite(likes_count) ? likes_count.toLocaleString('pt-BR') + ' curtidas' : 'Conteúdo exclusivo';
   if (Number.isFinite(likes_count)) left.setAttribute('aria-label', likes_count + ' curtidas');
   const note = document.createElement('span'); note.textContent = 'Só para assinantes';
   footer.append(left, note); article.append(footer);
@@ -281,6 +364,7 @@ let currentCheckoutToken = null;
 let checkoutVersion = 0;
 let selectedProduct = null;
 let checkoutBusy = false;
+let currentCreationTimer = null;
 let catalog = null;
 const API_BASE = location.protocol === 'file:' || (['localhost','127.0.0.1'].includes(location.hostname) && ['5500','5501'].includes(location.port)) ? 'http://localhost:3333' : '';
 const PRODUCT_ALIASES = { 'broadcast-access': 'monthly', 'private-contact': 'whatsapp_unlock', 'chat-unlock': 'whatsapp_unlock' };
@@ -295,25 +379,89 @@ function checkoutToken(product) {
   }
   return token;
 }
-function checkoutError(message, retry) {
+function savedPendingPix(productId = selectedProduct, token = null) {
+  return JoiceCheckouts.list().find(item => item.productId === productId && (!token || item.token === token)) || null;
+}
+async function pendingPixStatus(pending) {
+  const response = await fetch(API_BASE + '/api/orders/' + encodeURIComponent(pending.payment.orderId) + '/status', {
+    headers: { Authorization: 'Bearer ' + pending.token }, signal: AbortSignal.timeout(10000)
+  });
+  if (!response.ok) throw new Error('Não foi possível consultar o pagamento agora.');
+  return response.json();
+}
+function openPaidAccount(pending, needsClaim) {
+  if (needsClaim) JoiceCheckouts.select(pending);
+  else JoiceCheckouts.remove(pending);
+  location.assign(needsClaim ? '/criar-acesso?order=' + encodeURIComponent(pending.payment.orderId) : '/meu-acesso');
+}
+let pendingNoticeVersion = 0;
+async function refreshPendingPixNotice() {
+  const notice = document.getElementById('pendingPixNotice');
+  const version = ++pendingNoticeVersion;
+  const items = JoiceCheckouts.list();
+  if (!items.length) { notice.hidden = true; notice.replaceChildren(); return; }
+  const states = await Promise.all(items.map(async item => {
+    try { return { item, state: item.payment?.orderId ? await pendingPixStatus(item) : { status: 'CREATING' } }; }
+    catch (_) { return { item, state: { status: 'UNKNOWN' } }; }
+  }));
+  if (version !== pendingNoticeVersion) return;
+  const wasOpen = notice.open;
+  notice.replaceChildren();
+  const summary = document.createElement('summary');
+  summary.textContent = 'Compras recentes'; notice.append(summary);
+  notice.open = wasOpen || location.hash === '#pendingPixNotice';
+  const labels = { monthly: '1 mês', quarterly: '3 meses', semester: '6 meses', whatsapp_unlock: 'Contato WhatsApp' };
+  for (const { item, state } of states) {
+    if (!JoiceCheckouts.list().some(saved => saved.token === item.token)) continue;
+    if (state.status === 'PAID' && state.accountFlow && !state.needsClaim) { JoiceCheckouts.remove(item); continue; }
+    const paid = state.status === 'PAID';
+    const showAll = location.hash === '#pendingPixNotice';
+    const age = Date.now() - Number(item.createdAt || 0);
+    if (!showAll && ((!paid && (age >= 30 * 60 * 1000 || ['EXPIRED', 'CANCELED'].includes(state.status)))
+      || (item.noticeDismissedAt && (!paid || item.noticeDismissedPaid)))) continue;
+    const row = document.createElement('div'); row.className = 'pending-pix-row';
+    const text = document.createElement('span'), button = document.createElement('button'); button.type = 'button';
+    if (notice.children.length === 1) { text.id = 'pendingPixText'; button.id = 'pendingPixContinue'; }
+    let label = 'Compra em andamento';
+    button.textContent = 'Retomar compra';
+    button.onclick = () => openCheckout(item.productId, item.token);
+    if (state.status === 'PENDING') { label = 'Você tem um PIX pendente'; button.textContent = 'Continuar pagamento'; }
+    else if (state.status === 'PAID' && state.accountFlow) {
+      label = 'Pagamento confirmado'; button.textContent = 'Criar meu acesso';
+      button.onclick = () => openPaidAccount(item, true);
+    } else if (state.requiresReview) { label = 'Pedido em verificação'; button.textContent = 'Verificar pedido'; }
+    else if (['EXPIRED','CANCELED'].includes(state.status)) { label = 'Prazo do PIX encerrado'; button.textContent = 'Conferir pedido'; }
+    text.textContent = label + ' · ' + labels[item.productId];
+    const dismiss = document.createElement('button'); dismiss.type = 'button'; dismiss.className = 'pending-pix-dismiss';
+    dismiss.textContent = '×'; dismiss.setAttribute('aria-label', 'Dispensar aviso de ' + labels[item.productId]);
+    dismiss.onclick = () => { JoiceCheckouts.save({ ...item, noticeDismissedAt: Date.now(), noticeDismissedPaid: paid }); refreshPendingPixNotice(); };
+    row.append(text, button, dismiss); notice.append(row);
+  }
+  notice.hidden = notice.children.length <= 1;
+  summary.textContent = 'Compras recentes (' + (notice.children.length - 1) + ')';
+}
+function checkoutError(message, retry, reference = null) {
   const loading = document.getElementById('pixLoadingState');
   loading.replaceChildren(); loading.style.display = 'flex';
+  loading.setAttribute('role', 'status');
+  loading.setAttribute('aria-live', 'polite');
   const text = document.createElement('p'); text.textContent = message; loading.append(text);
+  if (reference) { const code = document.createElement('small'); code.className = 'checkout-reference'; code.textContent = 'Pedido: ' + reference; loading.append(code); }
   if (retry) {
-    const button = document.createElement('button'); button.className = 'btn-orange btn-pix';
+    const button = document.createElement('button'); button.type = 'button'; button.className = 'btn-orange btn-pix';
     button.textContent = 'Tentar novamente'; button.onclick = retry; loading.append(button);
   }
 }
-async function openCheckout(productId) {
+async function openCheckout(productId, resumeToken = null) {
   closeCheckout();
   const version = checkoutVersion;
   selectedProduct = PRODUCT_ALIASES[productId] || productId;
-  currentCheckoutToken = checkoutToken(selectedProduct);
+  const saved = savedPendingPix(selectedProduct, resumeToken);
+  currentCheckoutToken = saved?.token || checkoutToken(selectedProduct);
   currentOrderId = null;
   openModal('checkoutModalOverlay');
   document.getElementById('pixActiveArea').style.display = 'none';
-  document.getElementById('checkoutClientForm').style.display = 'none';
-  document.getElementById('pixSuccessNotification').style.display = 'none';
+
   document.getElementById('pixStatusContainer').classList.remove('paid');
   document.getElementById('checkoutPlanLabel').textContent = 'Carregando...';
   document.getElementById('checkoutPlanPrice').textContent = '';
@@ -328,15 +476,25 @@ async function openCheckout(productId) {
     if (!product) { checkoutError('Este produto ainda não está disponível para compra.'); return; }
     document.getElementById('checkoutPlanLabel').textContent = product.name;
     document.getElementById('checkoutPlanPrice').textContent = product.price.toLocaleString('pt-BR', {style:'currency',currency:'BRL'});
-    const form=document.getElementById('checkoutClientForm');
-    form.querySelectorAll('[data-gateway-field]').forEach(label=>{label.hidden=!data.requiresClient;label.querySelector('input').disabled=!data.requiresClient;});
-    let pending;try{pending=JSON.parse(localStorage.getItem('joice.buyer.pending'));}catch(_){}
-    if(pending?.productId===selectedProduct && /^[a-f0-9]{64}$/.test(pending.token||'') && pending.payment?.orderId){
-      currentCheckoutToken=pending.token;showBuyerPix(pending.payment,version,pending.token);return;
+    const pending = saved;
+    if (pending?.payment?.orderId) {
+      const status = await pendingPixStatus(pending);
+      if (version !== checkoutVersion) return;
+      if (status.status === 'PAID' && status.accountFlow) { openPaidAccount(pending, status.needsClaim); return; }
+      if (status.requiresReview || ['EXPIRED','CANCELED'].includes(status.status)) {
+        checkoutError(status.requiresReview
+          ? 'Seu pedido está em verificação. Não faça outro pagamento. Guarde esta referência para atendimento.'
+          : 'Este PIX não está mais pendente. Se você pagou, aguarde a confirmação antes de fazer outro pagamento.', null, pending.payment.orderId);
+        return;
+      }
+      if (status.status === 'PENDING' && pending.payment.pix?.copyPaste && pending.payment.pix?.qrCode) {
+        showBuyerPix(pending.payment, version, pending.token); return;
+      }
     }
-    document.getElementById('pixLoadingState').style.display = 'none'; form.style.display = 'grid';
+    fetch(API_BASE+'/api/conversions/checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({productId:selectedProduct,checkoutToken:currentCheckoutToken}),signal:AbortSignal.timeout(5000)}).catch(()=>{});
+    await createCheckoutPix(version);
   } catch (error) {
-    if (version === checkoutVersion) checkoutError(error.message, () => openCheckout(productId));
+    if (version === checkoutVersion) checkoutError(error.message, () => openCheckout(productId, currentCheckoutToken));
   }
 }
 async function createCheckoutPix(version = checkoutVersion) {
@@ -344,26 +502,65 @@ async function createCheckoutPix(version = checkoutVersion) {
   checkoutBusy = true;
   const productId = selectedProduct;
   const token = currentCheckoutToken;
-  const form = document.getElementById('checkoutClientForm');
-  const client = Object.fromEntries(new FormData(form));
-  form.style.display = 'none'; checkoutError('Gerando QR Code PIX...');
+  checkoutError('Gerando QR Code PIX...');
   try {
+    JoiceCheckouts.save(savedPendingPix(productId, token) || { productId, token });
     const response = await fetch(API_BASE + '/api/payments/pix', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(25000),
-      body: JSON.stringify({ productId, checkoutToken: token, client })
+      body: JSON.stringify({ productId, checkoutToken: token })
     });
     const data = await response.json();
+    if (data.orderId) {
+      const old = savedPendingPix(productId, token);
+      JoiceCheckouts.save({ productId, token, payment: { ...old?.payment, ...data } });
+    }
+    refreshPendingPixNotice();
     if (version !== checkoutVersion) return;
-    if (response.status === 202) { checkoutError('Sua cobrança está sendo gerada. Aguarde alguns instantes.', () => createCheckoutPix(version)); return; }
-    if (!response.ok) throw new Error(data.error || 'Não foi possível gerar o PIX.');
-    try{localStorage.setItem('joice.buyer.pending',JSON.stringify({productId,token,payment:data}));}catch(_){}
+    if (response.status === 202) {
+      checkoutError('Seu PIX está sendo preparado. Você pode aguardar aqui ou retomar este pedido depois.');
+      waitForPixCreation(data.orderId, version, token);
+      return;
+    }
+    if (!response.ok) {
+      checkoutError(data.error || 'Não foi possível consultar esta cobrança.',
+        data.retryable === true ? () => createCheckoutPix(version) : null, data.requiresReview ? data.orderId : null);
+      return;
+    }
+    JoiceCheckouts.select(savedPendingPix(productId, token));
     showBuyerPix(data,version,token);
   } catch (error) {
-    if(version===checkoutVersion)checkoutError(error.message,()=>{document.getElementById('pixLoadingState').style.display='none';form.style.display='grid';});
+    if(version===checkoutVersion) {
+      const connectionError = ['TimeoutError', 'AbortError', 'TypeError'].includes(error.name);
+      checkoutError(connectionError
+        ? 'A conexão demorou ou foi interrompida. Tente novamente para consultar a mesma cobrança com segurança.'
+        : error.message, () => createCheckoutPix(version));
+    }
   } finally { if(version===checkoutVersion)checkoutBusy=false; }
 }
+function waitForPixCreation(orderId, version, token) {
+  clearTimeout(currentCreationTimer);
+  currentCreationTimer = setTimeout(async () => {
+    if (version !== checkoutVersion) return;
+    try {
+      const pending = JoiceCheckouts.list().find(item => item.token === token);
+      if (!pending) return;
+      const state = await pendingPixStatus(pending);
+      if (version !== checkoutVersion) return;
+      if (state.status === 'PAID' && state.accountFlow) { openPaidAccount(pending, state.needsClaim); return; }
+      if (state.status === 'PENDING' || state.retryable) { createCheckoutPix(version); return; }
+      if (state.requiresReview || state.status !== 'CREATING') {
+        checkoutError('Seu pedido está em verificação. Não faça outro pagamento. Guarde esta referência para atendimento.', null, orderId);
+        refreshPendingPixNotice(); return;
+      }
+    } catch (_) {
+      if (version !== checkoutVersion) return;
+      checkoutError('A conexão foi interrompida. Vamos consultar o mesmo pedido novamente.');
+    }
+    waitForPixCreation(orderId, version, token);
+  }, 3000);
+}
 function showBuyerPix(data,version,token){
-    document.getElementById('checkoutClientForm').style.display='none';
+
     currentOrderId = data.orderId;
     document.getElementById('pixCodeInput').value = data.pix.copyPaste;
     const qr = document.getElementById('pixQrImage'); qr.src = data.pix.qrCode; qr.style.display = 'block';
@@ -371,7 +568,9 @@ function showBuyerPix(data,version,token){
     document.getElementById('pixActiveArea').style.display = 'block';
     const copy = document.getElementById('btnCopyPix'); copy.disabled = false; copy.textContent = 'COPIAR CÓDIGO PIX'; copy.classList.remove('copied');
     document.getElementById('pixMockNotice').hidden = !data.mock;
-    document.getElementById('pixStatusMessage').textContent = 'Aguardando pagamento...';
+    const stagingButton=document.getElementById('stagingConfirm');stagingButton.hidden=!data.staging;
+    if(data.staging){const btn=stagingButton;btn.disabled=false;btn.textContent='SIMULAR PAGAMENTO — STAGING';btn.onclick=async()=>{btn.disabled=true;try{const r=await fetch('/api/staging/confirm',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({orderId:data.orderId,claimToken:token})});if(!r.ok)throw Error();}catch(_){btn.disabled=false;btn.textContent='Tentar simulação novamente';}};}
+    document.getElementById('pixStatusMessage').textContent = 'Aguardando pagamento... não precisa atualizar';
     startPaymentStatusPolling(data.orderId, version, token);
 }
 function startPaymentStatusPolling(orderId, version, token) {
@@ -384,21 +583,19 @@ function startPaymentStatusPolling(orderId, version, token) {
       const data = await response.json();
       if (version !== checkoutVersion) return;
       const message = document.getElementById('pixStatusMessage');
-      if (data.status === 'PAID' && data.granted === true) {
-        try { localStorage.setItem('joice.vip.access',JSON.stringify({orderId,token}));localStorage.removeItem('joice.buyer.pending'); } catch (_) {}
-        document.getElementById('pixStatusContainer').classList.add('paid');
-        message.textContent = 'Pagamento confirmado ✅';
-        document.getElementById('pixSuccessNotification').style.display = 'block';
-        document.getElementById('btnCopyPix').disabled = true;
-        currentPollingInterval = null; return;
+      if(data.status==='PAID' && data.accountFlow){
+        currentPollingInterval=null;
+        const pending = JoiceCheckouts.list().find(item => item.token === token);
+        if (pending) openPaidAccount(pending, data.needsClaim);
+        return;
       }
       if (['EXPIRED','CANCELED','FAILED'].includes(data.status)) {
-        try { localStorage.removeItem('joice.buyer.pending');sessionStorage.removeItem('joice.checkout.'+selectedProduct); } catch (_) {}
-        message.textContent = data.status === 'EXPIRED' ? 'Prazo encerrado. Se você pagou, reabra o checkout para consultar.' : 'Cobrança indisponível.';
+        // Keep the claim: a delayed valid webhook may still confirm this order.
+        message.textContent = data.requiresReview ? 'Pedido em verificação. Não faça outro pagamento.' : 'PIX indisponível. Se você pagou, aguarde a confirmação.';
         document.getElementById('btnCopyPix').disabled = true;
-        currentPollingInterval = null; return;
+        currentPollingInterval = null; refreshPendingPixNotice(); return;
       }
-      message.textContent = 'Aguardando pagamento...';
+      message.textContent = 'Aguardando pagamento... não precisa atualizar';
     } catch (_) {
       if (version !== checkoutVersion) return;
       document.getElementById('pixStatusMessage').textContent = 'Sem conexão. Consultando novamente...';
@@ -409,10 +606,10 @@ function startPaymentStatusPolling(orderId, version, token) {
 }
 function closeCheckout() {
   checkoutVersion++; checkoutBusy = false;
+  clearTimeout(currentCreationTimer); currentCreationTimer = null;
   clearTimeout(currentPollingInterval); currentPollingInterval = null;
   closeModal('checkoutModalOverlay');
 }
-document.getElementById('checkoutClientForm').addEventListener('submit', event => { event.preventDefault(); createCheckoutPix(); });
 document.addEventListener('keydown', event => { if (event.key === 'Escape') closeCheckout(); });
 window.addEventListener('pagehide', closeCheckout);
 
@@ -428,57 +625,6 @@ document.getElementById('btnLiveJoin')?.addEventListener('click', () => {
 
 /* ===========================
    FLOATING WHATSAPP → Contact Modal
-   =========================== */
-document.getElementById('floatingWhatsapp')?.addEventListener('click', () => {
-  openModal('whatsappModalOverlay');
-  startWapTimer();
-});
-document.getElementById('closeWapModal')?.addEventListener('click', () => {
-  closeModal('whatsappModalOverlay');
-  stopWapTimer();
-});
-document.getElementById('btnWapUnlock')?.addEventListener('click', () => {
-  closeModal('whatsappModalOverlay');
-  stopWapTimer();
-  openCheckout('private-contact');
-});
-
-/* ===========================
-   WAP TIMER
-   Uses offerExpiresAt if set, else defaults to 57s
-   =========================== */
-let wapTimerInterval = null;
-let wapSeconds = 57;
-
-function startWapTimer() {
-  if (offerExpiresAt) {
-    wapSeconds = Math.max(0, Math.round((offerExpiresAt - Date.now()) / 1000));
-  } else {
-    wapSeconds = 57;
-  }
-  updateWapTimer();
-  clearInterval(wapTimerInterval);
-  wapTimerInterval = setInterval(() => {
-    if (wapSeconds > 0) { wapSeconds--; updateWapTimer(); }
-    else clearInterval(wapTimerInterval);
-  }, 1000);
-}
-function stopWapTimer() { clearInterval(wapTimerInterval); }
-function updateWapTimer() {
-  const m = String(Math.floor(wapSeconds / 60)).padStart(2, '0');
-  const s = String(wapSeconds % 60).padStart(2, '0');
-  const el = document.getElementById('wapTimer');
-  if (el) el.textContent = `${m}:${s}`;
-}
-
-/* ===========================
-   BOTÃO FLUTUANTE
-   Mesma ação do Chat do perfil: abre o WhatsApp da Joice.
-   =========================== */
-document.getElementById('floatingChatAvatar')?.addEventListener('click', openWhatsapp);
-
-/* ===========================
-   SUBSCRIBE / PLAN BUTTONS
    =========================== */
 const btnSubscribeNow = document.getElementById('btnSubscribeNow');
 if (btnSubscribeNow) btnSubscribeNow.addEventListener('click', () => openCheckout('monthly'));
@@ -510,42 +656,19 @@ document.addEventListener('click', event => {
   if (event.target.closest('.btn-unlock')) openCheckout('monthly');
 });
 
-/* ===========================
-   MIMO E CHAT
-   Mimo é informativo: não cria pedido nem cobrança.
-   Chat abre o WhatsApp da Joice, quando o número estiver configurado no
-   servidor (WHATSAPP_NUMBER). Sem número, mostra o mesmo aviso — o número
-   nunca fica escrito no frontend.
-   =========================== */
-let whatsappUrl = null;
-function showNotice(title, text) {
-  document.getElementById('noticeTitle').textContent = title;
-  document.getElementById('noticeText').textContent = text;
-  openModal('noticeModalOverlay');
-}
-document.getElementById('noticeClose')?.addEventListener('click', () => closeModal('noticeModalOverlay'));
-function openWhatsapp() {
-  if (whatsappUrl) return window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
-  showNotice('Em breve', 'O contato direto ainda não está disponível. Assim que abrir, você vê o aviso aqui mesmo na página.');
-}
-document.getElementById('btnChat')?.addEventListener('click', openWhatsapp);
+// Perfil público
 (async function loadProfile() {
   try {
-    const response = await fetch(API_BASE + '/api/profile', { signal: AbortSignal.timeout(8000) });
+    let changed = false;
+    try { changed = sessionStorage.getItem('joice.profile.changed') === '1'; sessionStorage.removeItem('joice.profile.changed'); } catch (_) {}
+    const response = await fetch(API_BASE + '/api/profile', { cache: changed ? 'reload' : 'default', signal: AbortSignal.timeout(8000) });
     if (!response.ok) throw new Error('Perfil indisponível');
     const profile = await response.json();
     if (profile && typeof profile.name === 'string') applyProfile(profile);
   } catch (_) { document.getElementById('profileBio').textContent = 'Não foi possível carregar o perfil. Atualize a página.'; }
 })();
 
-(async function loadContact() {
-  try {
-    const response = await fetch(API_BASE + '/api/contact', { signal: AbortSignal.timeout(8000) });
-    if (!response.ok) return;
-    const data = await response.json();
-    if (typeof data.whatsapp === 'string' && data.whatsapp.startsWith('https://')) whatsappUrl = data.whatsapp;
-  } catch (_) { /* sem contato configurado: o aviso acima assume */ }
-})();
+
 
 /**
  * Troca as prévias estáticas pelas publicações marcadas em /admin.
@@ -555,67 +678,114 @@ document.getElementById('btnChat')?.addEventListener('click', openWhatsapp);
  * pronta do servidor como imagem minúscula — não existe caminho de mídia aqui.
  */
 (async function loadManagedPreviews() {
-  let previews;
-  let managed = false;
-  try {
-    const response = await fetch(API_BASE + '/api/home/previews', { signal: AbortSignal.timeout(8000) });
-    if (!response.ok) return;
-    const data = await response.json(); previews = data.previews; managed = data.source === 'managed';
-  } catch (_) { return; }
-  if (!Array.isArray(previews)) return;
-  if (previews.length === 0) {
-    if (managed) document.querySelectorAll('.preview-post').forEach(post => post.remove());
-    return;
-  }
-
-  const existing = document.querySelectorAll('.preview-post');
-  const blueprint = existing[0]?.querySelector('.post-header');
+  await window.ageReady;
+  // Feed em páginas: o visitante recebe as primeiras prévias e o resto chega
+  // ao chegar perto do fim. Menos bytes e menos vídeos no primeiro desenho.
+  const PAGE = 6;
   const anchor = document.querySelector('#contentTabs .tabs-bar');
+  const existing = [...document.querySelectorAll('.preview-post')];
+  const blueprint = existing[0]?.querySelector('.post-header');
+  const overlayModel = document.querySelector('.locked-overlay')?.innerHTML || '';
   if (!blueprint || !anchor) return;
 
-  const fragment = document.createDocumentFragment();
-  previews.forEach((item, index) => {
-    if (!item || typeof item.preview !== 'string' || !item.preview.startsWith('data:image/jpeg;base64,')) return;
-    const header = blueprint.cloneNode(true);
-    header.querySelector('.post-type')?.remove();
-    const locked = document.createElement('div');
-    locked.className = 'locked-post';
-    const image = document.createElement('img');
-    image.className = 'locked-img';
-    image.src = item.preview;
-    image.alt = item.type === 'video' ? 'Prévia desfocada de um vídeo exclusivo' : 'Prévia desfocada de uma foto exclusiva';
-    image.loading = 'lazy'; image.width = 64; image.height = 80;
-    const overlay = document.createElement('div');
-    overlay.className = 'locked-overlay';
-    overlay.innerHTML = document.querySelector('.locked-overlay')?.innerHTML || '';
-    locked.append(image, overlay);
-    JoiceFrame.apply(image,item.crop,{box:locked});
-    // Vídeo com teaser derivado: o <video> entra por cima do pôster, que fica
-    // atrás como primeiro quadro e como plano B se o autoplay for bloqueado.
-    if (item.type === 'video' && typeof item.teaser === 'string' && item.teaser.startsWith('/api/home/preview-video/')) {
-      locked.classList.add('has-teaser');
-      const video = mountTeaser(locked, { src: API_BASE + item.teaser, seconds: item.teaserSeconds, poster: item.preview, overlay });
-      JoiceFrame.apply(video, item.crop, { box: locked });
-    }
-    // Carrossel bloqueado: só entram itens que trazem a SUA derivada segura —
-    // a amostra minúscula da foto ou a rota do teaser do vídeo. Item sem
-    // derivada simplesmente não vira slide; o original nunca é alternativa.
-    const safe = Array.isArray(item.items) ? item.items.filter(isSafePreviewItem) : [];
-    if (safe.length > 1) mountLockedCarousel(locked, overlay, safe, item.teaserSeconds);
-    fragment.append(header, locked);
-  });
-  if (!fragment.childNodes.length) return;
+  let rendered = 0;
+  let total = 0;
+  let carregando = false;
+  let sentinela = null;
 
-  existing.forEach(article => article.remove());
-  anchor.after(fragment);
-  document.querySelectorAll('.locked-post').forEach((post, index) => {
-    const item = previews[index];
-    decorateLockedPost(post, {
-      id: item.id, likes_count: item.likes_count,
-      type: item.type === 'video' ? 'video' : 'image',
-      caption: item.caption || HOME_CAPTIONS[index % HOME_CAPTIONS.length]
+  async function buscar(offset) {
+    const response = await fetch(`${API_BASE}/api/home/previews?limit=${PAGE}&offset=${offset}`, { signal: AbortSignal.timeout(8000) });
+    if (!response.ok) throw new Error('previews');
+    const data = await response.json();
+    return { previews: Array.isArray(data.previews) ? data.previews : [], total: Number(data.total) || 0, managed: data.source === 'managed' };
+  }
+
+  function montar(previews) {
+    const fragment = document.createDocumentFragment();
+    const usados = [];
+    previews.forEach((item, index) => {
+      if (!item || typeof item.preview !== 'string' || !item.preview.startsWith('data:image/jpeg;base64,')) return;
+      const header = blueprint.cloneNode(true);
+      header.querySelector('.post-type')?.remove();
+      const locked = document.createElement('div');
+      locked.className = 'locked-post';
+      const image = document.createElement('img');
+      image.className = 'locked-img';
+      image.src = item.preview;
+      image.alt = item.type === 'video' ? 'Prévia desfocada de um vídeo exclusivo' : 'Prévia desfocada de uma foto exclusiva';
+      // Só a primeira prévia da PRIMEIRA página entra como prioritária.
+      image.loading = rendered === 0 && index === 0 ? 'eager' : 'lazy';
+      image.decoding = 'async';
+      image.width = 64; image.height = 80;
+      const overlay = document.createElement('div');
+      overlay.className = 'locked-overlay';
+      overlay.innerHTML = overlayModel;
+      locked.append(image, overlay);
+      JoiceFrame.apply(image, item.crop, { box: locked, preview: true });
+      // Vídeo com teaser derivado: o <video> entra por cima do pôster, que fica
+      // atrás como primeiro quadro e como plano B se o autoplay for bloqueado.
+      if (item.type === 'video' && typeof item.teaser === 'string' && item.teaser.startsWith('/api/home/preview-video/')) {
+        locked.classList.add('has-teaser');
+        const video = mountTeaser(locked, { src: API_BASE + item.teaser, seconds: item.teaserSeconds, poster: item.preview, overlay });
+        JoiceFrame.apply(video, item.crop, { box: locked, preview: true });
+      }
+      // Carrossel bloqueado: só entram itens que trazem a SUA derivada segura —
+      // a amostra minúscula da foto ou a rota do teaser do vídeo. Item sem
+      // derivada simplesmente não vira slide; o original nunca é alternativa.
+      const safe = Array.isArray(item.items) ? item.items.filter(isSafePreviewItem) : [];
+      if (safe.length > 1) mountLockedCarousel(locked, overlay, safe, item.teaserSeconds);
+      fragment.append(header, locked);
+      usados.push(item);
     });
-  });
+    return { fragment, usados };
+  }
+
+  function decorar(usados) {
+    const cards = [...document.querySelectorAll('.locked-post')];
+    usados.forEach((item, index) => {
+      const post = cards[rendered + index];
+      if (!post) return;
+      decorateLockedPost(post, {
+        id: item.id, likes_count: item.likes_count,
+        type: item.type === 'video' ? 'video' : 'image',
+        caption: item.caption || HOME_CAPTIONS[(rendered + index) % HOME_CAPTIONS.length]
+      });
+    });
+  }
+
+  async function pagina(offset) {
+    if (carregando) return;
+    carregando = true;
+    try {
+      const data = await buscar(offset);
+      total = data.total || data.previews.length;
+      if (offset === 0 && data.previews.length === 0) {
+        if (data.managed) existing.forEach(post => post.remove());
+        return;
+      }
+      const { fragment, usados } = montar(data.previews);
+      if (!fragment.childNodes.length) return;
+      if (offset === 0) { existing.forEach(article => article.remove()); anchor.after(fragment); }
+      else { (sentinela || [...document.querySelectorAll('.locked-post')].pop())?.before(fragment); }
+      decorar(usados);
+      rendered += usados.length;
+    } finally { carregando = false; }
+  }
+
+  await pagina(0).catch(() => {});
+  if (!rendered || rendered >= total) return;
+
+  // Próxima página só quando o visitante chega perto do fim do que já existe.
+  sentinela = document.createElement('div');
+  sentinela.className = 'feed-sentinela';
+  sentinela.setAttribute('aria-hidden', 'true');
+  [...document.querySelectorAll('.locked-post')].pop()?.after(sentinela);
+  const observer = new IntersectionObserver(async entries => {
+    if (!entries.some(entry => entry.isIntersecting) || carregando) return;
+    await pagina(rendered).catch(() => {});
+    if (rendered >= total) { observer.disconnect(); sentinela.remove(); }
+  }, { rootMargin: '600px 0px' });
+  observer.observe(sentinela);
 })();
 
 /* ===========================
@@ -641,40 +811,6 @@ document.getElementById('btnCopyPix')?.addEventListener('click', async () => {
         btn.classList.remove('copied');
       }, 2500);
     }
-  }
-});
-
-document.getElementById('btnAccessNow')?.addEventListener('click', async () => {
-  if (!currentOrderId) {
-    alert('Nenhum pedido ativo no momento.');
-    return;
-  }
-  
-  const btn = document.getElementById('btnAccessNow');
-  const originalText = btn.textContent;
-  const version = checkoutVersion;
-  btn.disabled = true;
-  btn.textContent = 'ABRINDO...';
-
-  try {
-    // Confirma no servidor ANTES de sair da página: se a assinatura não
-    // estiver ativa, o cliente vê o motivo aqui em vez de cair numa área
-    // vazia. A área VIP refaz essa checagem de qualquer forma.
-    const res = await fetch(`${API_BASE}/api/vip/${currentOrderId}`, { headers: authHeaders() });
-    const data = await res.json().catch(() => ({}));
-    if (version !== checkoutVersion) return;
-    if (!res.ok || !data.granted) throw new Error(data.error || 'Não foi possível abrir seu conteúdo.');
-
-    // O token do checkout é a credencial: vai na hash (não é enviada ao
-    // servidor nem entra no Referer) e a área VIP a guarda para as próximas
-    // visitas. Quem valida continua sendo o backend, a cada requisição.
-    window.location.assign(`/vip#o=${encodeURIComponent(currentOrderId)}&t=${currentCheckoutToken}`);
-  } catch (err) {
-    console.error(err);
-    if (version === checkoutVersion) alert(err.message);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = originalText;
   }
 });
 
@@ -754,37 +890,99 @@ document.addEventListener('keydown', event => {
   else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
 });
 // Buyer identity and recovery: never grants access without server verification.
-function maskBuyerPhone(input){
- input.addEventListener('input',()=>{let d=input.value.replace(/\D/g,'').slice(0,11);input.value=d.length>7?'('+d.slice(0,2)+') '+d.slice(2,7)+'-'+d.slice(7):d.length>2?'('+d.slice(0,2)+') '+d.slice(2):d;});
-}
-document.querySelectorAll('#checkoutClientForm input[name="phone"], #buyerRecoveryPhone input').forEach(maskBuyerPhone);
-let buyerChallenge=null;
-function openBuyerRecovery(){
- document.getElementById('buyerRecoveryCode').hidden=true;
- document.getElementById('buyerRecoveryPhone').hidden=false;
- document.getElementById('buyerRecoveryStatus').textContent='';buyerChallenge=null;openModal('buyerRecoveryModal');
-}
-document.getElementById('buyerRecoveryClose').onclick=()=>closeModal('buyerRecoveryModal');
-document.querySelectorAll('[data-buyer-access]').forEach(link=>link.addEventListener('click',event=>{
- let access;try{access=JSON.parse(localStorage.getItem('joice.vip.access'));}catch(_){}
- if(access?.orderId && /^[a-f0-9]{64}$/.test(access.token||''))return;
- event.preventDefault();openBuyerRecovery();
-}));
-async function buyerRecoverySubmit(event,phase){
- event.preventDefault();const form=event.currentTarget,button=form.querySelector('button'),status=document.getElementById('buyerRecoveryStatus');button.disabled=true;
- try{
-  const values=Object.fromEntries(new FormData(form));
-  const response=await fetch(API_BASE+'/api/buyer/recovery/'+phase,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...values,challenge:buyerChallenge}),signal:AbortSignal.timeout(15000)});
-  const data=await response.json();if(!response.ok)throw new Error(data.error||'Tente novamente mais tarde.');
-  if(phase==='request'){
-   buyerChallenge=data.challenge;form.hidden=true;document.getElementById('buyerRecoveryCode').hidden=false;status.textContent=data.message;
-   document.querySelector('#buyerRecoveryCode input').focus();
-  }else{
-   localStorage.setItem('joice.vip.access',JSON.stringify({orderId:data.orderId,token:data.token}));location.assign('/vip');
-  }
- }catch(error){status.textContent=error.message;}finally{button.disabled=false;}
-}
-document.getElementById('buyerRecoveryPhone').addEventListener('submit',event=>buyerRecoverySubmit(event,'request'));
-document.getElementById('buyerRecoveryCode').addEventListener('submit',event=>buyerRecoverySubmit(event,'verify'));
+
+document.querySelectorAll('[data-buyer-access]').forEach(link=>{link.href='/meu-acesso';});
+function openBuyerRecovery(){location.assign('/esqueci-senha');}
 if(new URLSearchParams(location.search).get('recover')==='1')openBuyerRecovery();
-else {try{const pending=JSON.parse(localStorage.getItem('joice.buyer.pending'));if(pending?.productId)openCheckout(pending.productId);}catch(_){}}
+else {
+  // A saved order is resumed only after an explicit choice, never on reload.
+  // Consume the VIP contact link so refreshing it cannot reopen checkout.
+  const url = new URL(location.href);
+  const buy = url.searchParams.get('buy');
+  if (buy === 'whatsapp_unlock') {
+    url.searchParams.delete('buy');
+    history.replaceState(history.state, '', url.pathname + url.search + url.hash);
+    if (performance.getEntriesByType('navigation')[0]?.type !== 'reload') {
+      window.ageReady.then(() => openCheckout(buy));
+    }
+  }
+}
+window.ageReady.then(refreshPendingPixNotice);
+window.addEventListener('storage', event => { if (event.key?.startsWith(JoiceCheckouts.prefix)) refreshPendingPixNotice(); });
+window.addEventListener('focus', refreshPendingPixNotice);
+
+
+// Contato pago: usa o checkout existente e uma credencial separada do VIP.
+async function openPaidContact(access) {
+  const response = await fetch(API_BASE + '/api/contact/' + encodeURIComponent(access.orderId), {
+    signal: AbortSignal.timeout(15000)
+  });
+  const data = await response.json();
+  if (!response.ok || !data.whatsapp) throw new Error(data.error || 'Contato indisponível.');
+  const url = new URL(data.whatsapp);
+  if (url.protocol !== 'https:') throw new Error('Contato inválido.');
+  window.location.assign(url.href);
+}
+const contactChat = document.getElementById('contactChat');
+const contactFab = document.getElementById('contactFab');
+const contactTyping = document.getElementById('contactTyping');
+const contactWelcome = document.getElementById('contactWelcome');
+let contactWelcomeTimer;
+function closeContactChat() {
+  clearTimeout(contactWelcomeTimer);
+  contactTyping.hidden = true;
+  contactWelcome.hidden = true;
+  contactChat.hidden = true;
+  contactFab.setAttribute('aria-expanded', 'false');
+}
+contactFab.addEventListener('click', () => {
+  if (!contactChat.hidden) { closeContactChat(); return; }
+  contactChat.hidden = false;
+  contactFab.setAttribute('aria-expanded', 'true');
+  contactWelcome.hidden = true;
+  contactTyping.hidden = false;
+  clearTimeout(contactWelcomeTimer);
+  contactWelcomeTimer = setTimeout(() => {
+    if (contactChat.hidden) return;
+    contactTyping.hidden = true;
+    contactWelcome.hidden = false;
+  }, 4000);
+  document.getElementById('contactChatClose').focus();
+});
+document.getElementById('contactChatClose').addEventListener('click', () => { closeContactChat(); contactFab.focus(); });
+contactChat.addEventListener('keydown', e => { if (e.key === 'Escape') { closeContactChat(); contactFab.focus(); } });
+async function showContactUnlock() {
+  closeContactChat(); openModal('contactUnlockModal');
+  const button = document.getElementById('contactBuy');
+  const status = document.getElementById('contactUnlockStatus');
+  button.disabled = true; status.textContent = 'Consultando disponibilidade…';
+  try {
+    const response = await fetch(API_BASE + '/api/contact', { signal: AbortSignal.timeout(10000) });
+    if (!response.ok) throw new Error('Contato temporariamente indisponível.');
+    const data = await response.json();
+    const contactPrice = Number(data.price).toLocaleString('pt-BR', { style:'currency', currency:'BRL' });
+    const accountResponse = await fetch(API_BASE + '/api/buyer/account');
+    const account = accountResponse.ok ? await accountResponse.json() : null;
+    const owned = account?.orders?.find(o => o.grant_type === 'contact' && o.status === 'ACTIVE');
+    const access = owned ? {orderId: owned.public_id} : null;
+    const saved = Boolean(access);
+    button.textContent = saved ? 'Abrir meu WhatsApp' : 'DESBLOQUEAR POR ' + contactPrice;
+    button.disabled = !data.available;
+    status.textContent = data.available ? '' : 'Contato temporariamente indisponível. Nenhuma cobrança será gerada.';
+    button.onclick = async () => {
+      if (saved) {
+        button.disabled = true;
+        try { await openPaidContact(access); } catch (error) { status.textContent = error.message; button.disabled = false; }
+      } else { closeModal('contactUnlockModal'); openCheckout('whatsapp_unlock'); }
+    };
+  } catch (error) { status.textContent = error.message; }
+}
+document.getElementById('contactReply').addEventListener('submit', e => {
+  e.preventDefault();
+  e.currentTarget.querySelector('input').value = '';
+  showContactUnlock();
+});
+for (const id of ['contactUnlockClose','contactUnlockLater']) document.getElementById(id).addEventListener('click', () => closeModal('contactUnlockModal'));
+
+window.addEventListener('hashchange', refreshPendingPixNotice);
+setInterval(() => { if (!document.hidden) refreshPendingPixNotice(); }, 60000);

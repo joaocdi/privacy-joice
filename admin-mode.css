@@ -263,3 +263,51 @@ body.am-on { padding-top: var(--am-bar-height, 56px); }
 @media (prefers-reduced-motion: reduce) {
   .am-toast { transition: none; }
 }
+/* ---- Painel da criadora: estado, blocos e progresso de envio ---- */
+.am-chips { display: inline-flex; flex-wrap: wrap; gap: 5px; margin-left: auto; align-items: center; }
+.am-chips-sheet { display: flex; margin: 0 0 14px; }
+.am-chip {
+  font: 600 9px/1 Poppins, system-ui, sans-serif;
+  letter-spacing: .6px;
+  padding: 5px 8px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  white-space: nowrap;
+}
+.am-chip-publicado { color: #2f7d4f; background: #eaf6ef; }
+.am-chip-rascunho  { color: #8a6a1f; background: #fbf3e0; }
+.am-chip-publico   { color: #2b5fa8; background: #eaf1fb; }
+.am-chip-vip       { color: #8a4bb5; background: #f4ecfb; }
+.am-chip-arquivado { color: #6b6b6b; background: #f0f0f0; }
+.am-chip-erro      { color: #b03a34; background: #fdeceb; }
+.am-chip-novo      { color: #55606b; background: #eef1f4; }
+
+.am-section { margin: 0 0 18px; padding: 0 0 14px; border-bottom: 1px solid #00000010; }
+.am-section:last-of-type { border-bottom: 0; padding-bottom: 0; }
+.am-section-title {
+  margin: 0 0 10px;
+  font: 600 10px/1 Poppins, system-ui, sans-serif;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: #8a8a8a;
+}
+.am-section-hint { margin: -6px 0 10px; font-size: 11px; color: #8a8a8a; }
+
+.am-sheet-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.am-progress {
+  flex: 1 1 100%;
+  height: 4px;
+  margin: 8px 0 0;
+  border-radius: 999px;
+  background: #00000012;
+  overflow: hidden;
+}
+.am-progress-bar { display: block; height: 100%; width: 0; background: currentColor; transition: width .2s ease; }
+
+@media (max-width: 420px) {
+  .am-chips { gap: 4px; }
+  .am-chip { font-size: 8px; padding: 4px 6px; }
+  .am-sheet-actions { flex-wrap: wrap; }
+}
+.am-sheet-actions .am-btn-quiet{background:#0000000a;border:1px solid #00000022;color:#4a4a4a;}
+.am-sheet-actions .am-btn-quiet:hover{background:#00000014;}

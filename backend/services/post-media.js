@@ -7,7 +7,7 @@
  * `vip_post_media`: caminho no Storage, enquadramento e as derivadas seguras.
  *
  * Por que a amostra e o teaser são da MÍDIA e não do post: num carrossel com
- * dois vídeos, cada um precisa do seu próprio teaser de 3s, e cada foto da sua
+ * dois vídeos, cada um precisa do seu próprio teaser de 5s, e cada foto da sua
  * própria amostra minúscula. Um campo por post não daria conta.
  *
  * COMPATIBILIDADE
@@ -165,7 +165,8 @@ async function replaceAll(db, post, items, sessionId) {
         VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(post_id,media_path) DO UPDATE SET sort_order=excluded.sort_order,crop_data=excluded.crop_data,updated_at=CURRENT_TIMESTAMP`,
       id, post.id, asset.type, asset.media_path, asset.media_driver, index, framing, preview, teaser);
     }
-    kept.push({ id, media_path: asset.media_path, oldPath: old?.media_path, oldTeaser: old?.preview_video, teaser });
+    const saved = await db.get('SELECT id FROM vip_post_media WHERE post_id=? AND media_path=?', post.id, asset.media_path);
+    kept.push({ id: saved.id, media_path: asset.media_path, oldPath: old?.media_path, oldTeaser: old?.preview_video, teaser });
   }
 
   // O que saiu da lista some da tabela; o arquivo vai para a limpeza segura.
@@ -199,7 +200,7 @@ async function releaseOrphans(transaction, paths) {
     if (!path || !path.startsWith('joice/') || media.driverName() !== 'supabase') continue;
     const stillUsed = await transaction(async db => {
       if (await cleanup.shared(db, path)) return true;
-      await db.run('INSERT INTO media_deletions(media_path) VALUES (?) ON CONFLICT(media_path) DO NOTHING', path);
+      await db.run('INSERT INTO media_deletions(media_path) VALUES (?) ON CONFLICT(media_path) DO NOTHING RETURNING media_path', path);
       return false;
     });
     if (stillUsed) { results.push({ path, storage: 'shared' }); continue; }

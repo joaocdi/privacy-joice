@@ -3,6 +3,8 @@ const products = require('../products');
 
 async function insertEntitlement(db, order) {
   if (order.status !== 'PAID') throw new Error('Order must be paid');
+  // Voluntary tips are receipts, never an access grant.
+  if (order.purchase_kind === 'tip') return null;
   const type = order.grant_type;
   if (!['subscription','ppv','contact'].includes(type)) throw new Error('Invalid grant type');
   if (type === 'ppv' && (!order.resource_type || !order.resource_id || order.access_type !== 'ppv')) throw new Error('Invalid PPV scope');
@@ -24,13 +26,21 @@ async function createOrUpdateEntitlement(orderId, productId) {
     return insertEntitlement(db, order);
   });
 }
-async function confirmPayment(publicId) {
+async function confirmPayment(publicId, expected = null) {
   return transaction(async db => {
     let order = await db.get('SELECT * FROM orders WHERE public_id=?', publicId);
     if (!order || !order.provider_payment_id) throw new Error('Payment not persisted');
+    if (expected && (order.payment_provider !== expected.provider || order.provider_payment_id !== expected.identifier || Math.round(Number(order.amount)*100) !== expected.cents)) throw Object.assign(new Error('Payment mismatch'), { status:409 });
     if (!['PENDING','EXPIRED','PAID'].includes(order.status)) throw new Error('Invalid transition');
     await db.run("UPDATE orders SET status='PAID', paid_at=COALESCE(paid_at,CURRENT_TIMESTAMP) WHERE id=?", order.id);
     order = await db.get('SELECT * FROM orders WHERE id=?', order.id);
+    if(order.claim_required && !order.buyer_id) {
+      if(!order.purchase_buyer_id) return null;
+      const buyer=await db.get("SELECT user_id FROM buyer_accounts WHERE user_id=? AND role='BUYER'",order.purchase_buyer_id);
+      if(!buyer) return null;
+      await db.run('UPDATE orders SET buyer_id=?,claimed_at=CURRENT_TIMESTAMP,claim_token_hash=NULL WHERE id=? AND buyer_id IS NULL',buyer.user_id,order.id);
+      order=await db.get('SELECT * FROM orders WHERE id=?',order.id);
+    }
     return insertEntitlement(db, order);
   });
 }
@@ -66,6 +76,7 @@ async function expireEntitlement(id) {
 }
 
 module.exports = {
+  insertEntitlement,
   activeSubscription,
   hasResourceAccess,
   createOrUpdateEntitlement,

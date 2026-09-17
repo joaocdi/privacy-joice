@@ -50,6 +50,21 @@ function getPool() {
     connectionTimeoutMillis: 10_000
   });
 
+  if(process.env.APP_ENV==='staging') {
+    const schema=process.env.STAGING_DATABASE_SCHEMA;
+    if(!/^staging_[a-z0-9_]+$/.test(schema||''))throw new Error('Staging requires an isolated schema');
+    // Every pooled request sets a transaction-local path: no public fallback.
+    pool.query=async(text,values)=>{
+      const client=await pool.connect();
+      try{
+        await client.query('BEGIN');await client.query(`SET LOCAL search_path TO "${schema}"`);
+        const found=await client.query('SELECT current_schema() AS schema');
+        if(found.rows[0].schema!==schema)throw new Error('Staging schema unavailable');
+        const result=await client.query(text,values);await client.query('COMMIT');return result;
+      }catch(e){await client.query('ROLLBACK').catch(()=>{});throw e;}finally{client.release();}
+    };
+  }
+
   pool.on('error', (error) => console.error('Postgres pool error:', error.message));
   return pool;
 }
@@ -111,6 +126,7 @@ function withReturningId(sql) {
   const trimmed = sql.trim().replace(/;$/, '');
   if (!/^insert\s/i.test(trimmed)) return { sql: trimmed, added: false };
   if (/\breturning\b/i.test(trimmed)) return { sql: trimmed, added: false };
+  if(/^insert\s+into\s+buyer_accounts\b/i.test(trimmed))return {sql:`${trimmed} RETURNING user_id AS id`,added:false};
   return { sql: `${trimmed} RETURNING id`, added: true };
 }
 
@@ -178,10 +194,11 @@ async function initDb() {
   // Depois das colunas existirem: a mídia única de cada post vira o item 1.
   await require('./content-migrations').backfillMedia(await getDb());
   // No public Data API access: all content/admin operations go through our backend.
-  for (const table of ['media_deletions', 'creator_profiles', 'vip_posts', 'vip_post_media', 'vip_content_settings', 'vip_post_likes', 'admin_sessions', 'admin_login_limits', 'vip_uploads', 'admin_users']) {
+  for (const table of ['conversion_events', 'media_deletions', 'creator_profiles', 'vip_posts', 'vip_post_media', 'vip_content_settings', 'vip_post_likes', 'admin_sessions', 'admin_login_limits', 'vip_uploads', 'admin_users']) {
     await getPool().query(`ALTER TABLE ${table} ENABLE ROW LEVEL SECURITY`);
   }
   await require('./grant-migrations').migrate(await getDb(), true);
+  await require('./account-migrations').migrate(await getDb(), true);
   return getDb();
 }
 
@@ -194,6 +211,13 @@ async function transaction(work) {
   const db = wrap((text, values) => client.query(text, values));
   try {
     await client.query('BEGIN');
+    if(process.env.APP_ENV==='staging'){
+      const schema=process.env.STAGING_DATABASE_SCHEMA;
+      if(!/^staging_[a-z0-9_]+$/.test(schema||''))throw new Error('Invalid staging schema');
+      await client.query(`SET LOCAL search_path TO "${schema}"`);
+      const found=await client.query('SELECT current_schema() AS schema');
+      if(found.rows[0].schema!==schema)throw new Error('Staging schema unavailable');
+    }
     const result = await work(db);
     await client.query('COMMIT');
     return result;

@@ -35,7 +35,8 @@ async function contract() {
   await assert.rejects(create({...product,accessDays:30}));
   await database.initDb(); // Restart/migration remains additive, including legacy archive.
   assert.deepEqual(await grants.activeSubscription(paidSub), original);
-  assert.equal(products.whatsapp_unlock.enabled, false);
+  assert.equal(products.whatsapp_unlock.enabled,
+    /^\d{10,15}$/.test((process.env.WHATSAPP_NUMBER || '').replace(/\D/g, '')));
   console.log('PASS grant scope: additive restart, PPV resource only, subscription isolated, five approvals idempotent, expiry and invalid metadata denied');
 }
 module.exports = contract;

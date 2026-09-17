@@ -98,9 +98,9 @@ async function main() {
   // Contato do WhatsApp: montado no servidor, nunca escrito no frontend.
   assert.equal((await request('/api/contact')).body.whatsapp, null, 'sem número configurado não existe link');
   process.env.WHATSAPP_NUMBER = '+55 (48) 99999-0000';
-  assert.equal((await request('/api/contact')).body.whatsapp, 'https://wa.me/5548999990000');
+  assert.equal((await request('/api/contact')).body.whatsapp, null, 'contato pago não é público');
   process.env.WHATSAPP_MESSAGE = 'Oi Joice!';
-  assert.equal((await request('/api/contact')).body.whatsapp, 'https://wa.me/5548999990000?text=Oi%20Joice!');
+  assert.equal((await request('/api/contact')).body.whatsapp, null, 'mensagem não expõe destino');
   for (const invalid of ['123', 'javascript:alert(1)', 'abcdefghij', '1'.repeat(16)]) {
     process.env.WHATSAPP_NUMBER = invalid;
     assert.equal((await request('/api/contact')).body.whatsapp, null, 'número inválido: ' + invalid);
@@ -114,7 +114,7 @@ async function main() {
   assert.ok(!/wa\.me|whatsapp\.com|\+?55\d{10}/i.test(homePage + homeScript), 'nenhum número ou link do WhatsApp no frontend');
   assert.equal((await request('/api/health', undefined, { Origin: 'https://evil.example' })).status, 403);
   assert.equal((await request('/api/payments/pix', { productId:'whatsapp_unlock', checkoutToken:token })).status, 409);
-  assert.equal(require('../products').whatsapp_unlock.price, 8.9);
+  assert.equal(require('../products').whatsapp_unlock.price, 7.9);
   assert.equal(require('../products').whatsapp_unlock.type, 'one_time');
   const { createOrder, updateOrderPayment } = require('../services/orders');
   const oneTime = await createOrder(require('../products').whatsapp_unlock, crypto.randomBytes(32).toString('hex'), 'mock');
@@ -130,14 +130,21 @@ async function main() {
   assert.equal((await (await getDb()).get('SELECT status FROM orders WHERE id=?', order.id)).status, 'PAID');
   console.log('PASS: concurrency, rollback, webhook validation/idempotency, authorization, expiry, price and persistence');
   await child('tests/provider.js');
+  await child('tests/syncpay.js');
+  await child('tests/tips.js');
+  await child('tests/creation-recovery.js');
+  await child('tests/buyer-accounts.js');
+  await child('tests/sigilopay-diagnostic.js');
   await child('tests/isolation.js');
   await child('tests/vercel-safety.js');
+  await child('tests/preview-consolidation.js');
   await child('tests/migration.js');
   await child('tests/persistence.js');
   await child('tests/vip.js');
   await child('tests/vip-supabase.js');
   await child('tests/admin.js');
   await child('tests/likes.js');
+  await child('tests/contact.js');
   await child('tests/buyer-recovery.js');
   await child('tests/grant-scope.js');
   await child('tests/admin-mode.js');

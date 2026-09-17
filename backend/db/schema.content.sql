@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS vip_posts (
   show_as_preview INTEGER NOT NULL DEFAULT 0,
   preview_image TEXT,
   -- Teaser de vídeo da HOME: o CAMINHO de um arquivo derivado e independente
-  -- (joice/previews/...), com ~3s, sem áudio e com o desfoque já gravado
+  -- (joice/previews/...), com ~5s, sem áudio e com o desfoque já gravado
   -- dentro dele. Nunca aponta para o original em joice/posts/.
   preview_video TEXT,
   -- Contagem exibida, definida pela criadora. As curtidas reais dos assinantes
@@ -118,3 +118,10 @@ CREATE TABLE IF NOT EXISTS admin_users (
   role TEXT NOT NULL DEFAULT 'admin',
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+CREATE TABLE IF NOT EXISTS conversion_events (
+ id TEXT PRIMARY KEY,
+ product_id TEXT NOT NULL,
+ event TEXT NOT NULL CHECK(event IN ('checkout_opened','whatsapp_clicked')),
+ created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS conversion_events_date ON conversion_events(created_at);

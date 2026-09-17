@@ -39,7 +39,7 @@
     }
     const response = await fetch(BASE + '/api/admin' + route, options);
     if (response.status === 401) {
-      location.assign('/login?r=' + encodeURIComponent(location.pathname));
+      location.assign('/criadora/login?r=' + encodeURIComponent(location.pathname));
       throw new Error('Sessão encerrada.');
     }
     const data = await response.json().catch(() => ({}));
@@ -80,6 +80,8 @@
   /* ----------------------------------------------------------------- modal */
 
   function openSheet(title, build, onSubmit) {
+    // Clique duplo não abre duas fichas nem cria dois posts.
+    if (document.querySelector('.am-sheet-overlay')) return null;
     const overlay = el('div', 'am-sheet-overlay');
     const sheet = el('form', 'am-sheet');
     sheet.noValidate = true;
@@ -89,10 +91,17 @@
     head.append(close);
     const body = el('div', 'am-sheet-body');
     const status = el('p', 'am-sheet-status');
+    // Barra de progresso do envio: some quando não há etapa em andamento.
+    const progress = el('div', 'am-progress');
+    const progressBar = el('i', 'am-progress-bar');
+    progress.append(progressBar);
+    progress.hidden = true;
     const save = el('button', 'am-btn am-btn-primary', 'Salvar');
     save.type = 'submit';
     const foot = el('div', 'am-sheet-foot');
-    foot.append(status, save);
+    const actions = el('div', 'am-sheet-actions');
+    actions.append(save);
+    foot.append(status, progress, actions);
     sheet.append(head, body, foot);
     overlay.append(sheet);
     document.body.append(overlay);
@@ -102,15 +111,72 @@
       if (!document.body.contains(overlay)) { document.body.style.overflow = ''; observer.disconnect(); }
     }).observe(document.body, { childList: true });
 
-    const context = { body, status, save, close: () => overlay.remove(), say: t => { status.textContent = t; } };
+    const context = {
+      body, status, save, foot, actions, sheet,
+      close: () => overlay.remove(),
+      // `say` aceita a etapa e, quando existe, o percentual do envio.
+      say: (t, percent) => {
+        status.textContent = t;
+        const value = Number(percent);
+        progress.hidden = !Number.isFinite(value);
+        if (Number.isFinite(value)) progressBar.style.width = Math.max(0, Math.min(100, value)) + '%';
+      }
+    };
     build(context);
+    let enviando = false;
     sheet.addEventListener('submit', async event => {
       event.preventDefault();
+      // Trava de reentrada: nem clique duplo, nem Enter repetido.
+      if (enviando) return;
+      enviando = true;
+      const extras = [...actions.querySelectorAll('button')];
       save.disabled = true; close.disabled = true;
+      extras.forEach(node => { node.disabled = true; });
       try { await onSubmit(context); }
-      catch (error) { context.say(error.message); save.disabled = false; close.disabled = false; }
+      catch (error) {
+        context.say(error.message);
+        enviando = false;
+        save.disabled = false; close.disabled = false;
+        extras.forEach(node => { node.disabled = false; });
+      }
     });
     return context;
+  }
+
+  /**
+   * Bloco do editor: Conteúdo, Visibilidade, Números, Ações.
+   *
+   * Só agrupa o que já existia — nenhum campo novo, nenhuma etapa a mais.
+   */
+  function section(parent, title, hint) {
+    const box = el('section', 'am-section');
+    box.append(el('h3', 'am-section-title', title));
+    if (hint) box.append(el('p', 'am-section-hint', hint));
+    parent.append(box);
+    return box;
+  }
+
+  /**
+   * Estado da publicação em uma palavra, do jeito que a criadora pensa:
+   * RASCUNHO/PUBLICADO, e onde ele aparece (HOME ou só VIP).
+   */
+  function statusOf(post) {
+    if (!post) return [{ text: 'NOVO', kind: 'novo' }];
+    const chips = [];
+    if (post.archived) chips.push({ text: 'ARQUIVADO', kind: 'arquivado' });
+    chips.push(post.published ? { text: 'PUBLICADO', kind: 'publicado' } : { text: 'RASCUNHO', kind: 'rascunho' });
+    if (post.published && !post.archived) {
+      chips.push(post.show_as_preview ? { text: 'PÚBLICO', kind: 'publico' } : { text: 'SÓ VIP', kind: 'vip' });
+    }
+    // Marcado para a HOME sem amostra gerada: precisa de ação da criadora.
+    if (post.show_as_preview && !post.has_preview) chips.push({ text: 'PRÉVIA PENDENTE', kind: 'erro' });
+    return chips;
+  }
+
+  function statusChips(post, className = 'am-chips') {
+    const wrap = el('div', className);
+    for (const chip of statusOf(post)) wrap.append(el('span', 'am-chip am-chip-' + chip.kind, chip.text));
+    return wrap;
   }
 
   function field(parent, label, control, hint) {
@@ -143,21 +209,26 @@
    * chave do Supabase nem a URL de upload.
    */
   async function sendFile(file, say) {
+    // Etapas visíveis: preparando -> enviando (%) -> processando -> concluído.
+    say('Preparando o arquivo…', 0);
+    file = await JoiceImageTools.post(file);
     if (file.size > uploadMax) throw new Error(`Arquivo acima do limite de ${Math.round(uploadMax / 1024 / 1024)} MB.`);
     let upload = await api('/uploads', 'POST', { size: file.size, mime: file.type });
     while (!upload.complete) {
-      say(`Enviando mídia: ${Math.round(upload.offset / file.size * 100)}%`);
+      const pct = Math.round(upload.offset / file.size * 100);
+      say(`Enviando mídia: ${pct}%`, pct);
       const part = file.slice(upload.offset, Math.min(file.size, upload.offset + upload.chunkSize));
       const sent = await api('/uploads/' + upload.id, 'PATCH', part,
         { 'Content-Type': 'application/octet-stream', 'upload-offset': String(upload.offset) });
       upload = { ...upload, ...sent };
     }
+    say('Processando a mídia…', 100);
     return upload.id;
   }
 
   /* --------------------------------------------------- teaser de vídeo */
 
-  const TEASER = { seconds: 3, height: 240, fps: 15, blur: 7 };
+  const TEASER = { seconds: 7, height: 240, fps: 15, blur: 7 };
   /** Mesmo teto do servidor (post-media.js): a tela não promete o que o backend recusa. */
   const MAX_MEDIA = 10;
 
@@ -178,7 +249,7 @@
    * Gera o teaser da HOME a partir do arquivo escolhido.
    *
    * O vídeo original NUNCA vai para a HOME. O que sai daqui é outro arquivo:
-   * ~3 segundos, 240p, SEM faixa de áudio e com o desfoque desenhado quadro a
+   * ~5 segundos, 240p, SEM faixa de áudio e com o desfoque desenhado quadro a
    * quadro dentro do canvas — ou seja, gravado no próprio arquivo, não
    * aplicado por CSS que qualquer um desliga no inspetor.
    *
@@ -252,7 +323,7 @@
    * Mostra no painel o teaser que está valendo na HOME.
    *
    * Carrega pela MESMA rota pública do visitante, então o que aparece aqui é
-   * exatamente o que ele vê: 3 segundos, sem som, já desfocado no arquivo.
+   * exatamente o que ele vê: 5 segundos, sem som, já desfocado no arquivo.
    * Publicação de foto, sem teaser ou fora da HOME não mostra nada.
    */
   function teaserPreview(parent, post) {
@@ -312,12 +383,7 @@
         source = image; width = image.naturalWidth; height = image.naturalHeight;
       }
       if (!width || !height) throw new Error('Mídia sem dimensões legíveis.');
-      const canvas = document.createElement('canvas');
-      const shrink = Math.min(64 / width, 128 / height);
-      canvas.width = Math.max(1,Math.round(width * shrink)); canvas.height = Math.max(1,Math.round(height * shrink));
-      const scale = Math.max(canvas.width / width, canvas.height / height);
-      canvas.getContext('2d').drawImage(source, (canvas.width - width * scale) / 2, (canvas.height - height * scale) / 2, width * scale, height * scale);
-      return canvas.toDataURL('image/jpeg', 0.55);
+      return JoiceImageTools.preview(source, width, height);
     } finally { URL.revokeObjectURL(url); }
   }
 
@@ -470,7 +536,7 @@
             try { item.preview_image = await derive(row.file, item.crop); }
             catch (_) { say?.(`Não consegui gerar a amostra da mídia ${index + 1}.`); }
             item.uploadId = await sendFile(row.file, say);
-            // Cada vídeo do carrossel tem o SEU teaser de ~3s.
+            // Cada vídeo do carrossel tem o SEU teaser de ~5s.
             if (wantsHome && row.file.type.startsWith('video/')) {
               const teaser = await deriveTeaser(row.file, say);
               if (teaser) item.previewUploadId = await sendTeaser(teaser, say);
@@ -488,28 +554,52 @@
     const editing = Boolean(post);
     openSheet(editing ? 'Editar publicação' : 'Nova publicação', context => {
       if (storage !== 'supabase') context.say('O Storage do Supabase não está configurado: o envio de mídia vai falhar.');
-      const medias = mediaList(context.body, post, context);
+      context.body.prepend(statusChips(post, 'am-chips am-chips-sheet'));
+
+      const conteudo = section(context.body, 'Conteúdo');
+      const medias = mediaList(conteudo, post, context);
 
       const caption = document.createElement('textarea');
       caption.rows = 4; caption.maxLength = 4000; caption.value = post?.caption || '';
       caption.placeholder = 'Escreva a legenda…';
-      field(context.body, 'Legenda', caption);
+      field(conteudo, 'Legenda', caption);
+
+      const visibilidade = section(context.body, 'Visibilidade');
+      const numeros = section(context.body, 'Ordem e números');
 
       const order = input('number', String(post?.sort_order ?? (posts.length ? Math.max(...posts.map(p => p.sort_order)) + 10 : 0)));
       order.min = '-1000000'; order.max = '1000000'; order.step = '1';
-      field(context.body, 'Ordem no feed', order, 'Número menor aparece primeiro.');
+      field(numeros, 'Ordem no feed', order, 'Número menor aparece primeiro.');
 
       // Número mostrado no coração. É o que você digita — não muda sozinho a
       // cada visita. As curtidas reais dos assinantes entram por cima dele.
       const likes = input('number', String(post?.likes_count ?? 0));
       likes.min = '0'; likes.max = '100000000'; likes.step = '1'; likes.inputMode = 'numeric';
-      field(context.body, 'Curtidas exibidas', likes, 'Número inteiro. Vazio conta como 0.');
+      field(numeros, 'Curtidas exibidas', likes, 'Número inteiro. Vazio conta como 0.');
 
-      const published = checkbox(context.body, 'Publicado', post ? post.published : true);
-      const preview = checkbox(context.body, 'Mostrar como prévia na HOME', post?.show_as_preview);
+      const published = checkbox(visibilidade, 'Publicado', post ? post.published : true);
+      const preview = checkbox(visibilidade, 'Mostrar como prévia na HOME', post?.show_as_preview);
       // Vídeo na HOME: mostra aqui o MESMO teaser derivado que o visitante vê,
       // para a criadora conferir o trecho antes de deixar no ar.
-      teaserPreview(context.body, post);
+      teaserPreview(visibilidade, post);
+
+      // Ações: o botão principal diz o que vai acontecer.
+      const sincronizar = () => { context.save.textContent = editing ? 'Atualizar' : (published.checked ? 'Publicar' : 'Salvar rascunho'); };
+      sincronizar();
+      published.addEventListener('change', sincronizar);
+      if (!editing) {
+        const rascunho = button('Salvar rascunho', () => {
+          published.checked = false; sincronizar();
+          context.sheet.requestSubmit();
+        }, 'am-btn am-btn-sm am-btn-quiet');
+        rascunho.type = 'button';
+        context.actions.prepend(rascunho);
+      }
+      if (editing) {
+        const excluir = button('Excluir', () => { context.close(); deleteSheet(post); }, 'am-btn am-btn-sm am-btn-quiet am-menu-danger');
+        excluir.type = 'button';
+        context.actions.prepend(excluir);
+      }
       context.state = { caption, order, published, preview, likes, medias };
     }, async context => {
       const { caption, order, published, preview, likes, medias } = context.state;
@@ -639,10 +729,11 @@
     }, async context => {
       const { name, username, bio, avatar, cover } = context.state;
       const body = { name: name.value, username: username.value, bio: bio.value, version: current.version, avatarCrop:context.state.avatarFrame.get(), coverCrop:context.state.coverFrame.get() };
-      if (avatar.files[0]) body.avatarUploadId = await sendFile(avatar.files[0], context.say);
-      if (cover.files[0]) body.coverUploadId = await sendFile(cover.files[0], context.say);
+      if (avatar.files[0]) body.avatarUploadId = await sendFile(await JoiceImageTools.profile(avatar.files[0], 'avatar'), context.say);
+      if (cover.files[0]) body.coverUploadId = await sendFile(await JoiceImageTools.profile(cover.files[0], 'cover'), context.say);
       await api('/profile', 'PUT', body);
       context.close();
+      try { sessionStorage.setItem('joice.profile.changed', '1'); } catch (_) {}
       toast('Perfil salvo. Recarregando…');
       setTimeout(() => location.reload(), 700);
     });
@@ -772,7 +863,8 @@
       const post = marked || source[position++];
       if (!post) return;
       const head = card.querySelector(isVip ? '.vip-post-head' : '.post-header');
-      if (head) head.append(menuFor(post));
+      // A criadora vê o estado sem abrir o menu: RASCUNHO, PUBLICADO, PÚBLICO/SÓ VIP.
+      if (head) head.append(statusChips(post), menuFor(post));
     });
   }
 

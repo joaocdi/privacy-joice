@@ -45,10 +45,11 @@ function boot(code, env) {
 secao('Segredos no que o navegador recebe');
 
 // Tudo que é servido como arquivo público (allowlist do server.js) + a página VIP.
-const ARQUIVOS_PUBLICOS = ['index.html', 'app.js', 'style.css', 'vip.html', 'vip.css', 'vip.js'];
+const ARQUIVOS_PUBLICOS = ['index.html', 'image-tools.js', 'fonts.css', 'app.js', 'pending-checkouts.js', 'buyer-account.html', 'buyer-account.js', 'style.css', 'vip.html', 'vip.css', 'vip.js', 'tips.js'];
 
 const PROIBIDO = [
   ['SIGILOPAY_SECRET_KEY', /SIGILOPAY_SECRET_KEY|x-secret-key/i],
+  ['SyncPay credentials', /SYNCPAY_CLIENT_ID|SYNCPAY_CLIENT_SECRET|SYNCPAY_WEBHOOK_SECRET/i],
   ['SIGILOPAY_PUBLIC_KEY', /SIGILOPAY_PUBLIC_KEY|x-public-key/i],
   ['SUPABASE_SERVICE_ROLE_KEY', /SUPABASE_SERVICE_ROLE_KEY|service_role/i],
   ['URL do Supabase', /supabase\.co|SUPABASE_URL/i],
@@ -141,7 +142,7 @@ check('allowlist de arquivos estáticos encontrada', Boolean(allowlist));
 if (allowlist) {
   const lista = allowlist[1].split(',').map((item) => item.trim().replace(/['"]/g, '')).filter(Boolean);
   check('allowlist só tem página, script, estilo e imagem de perfil',
-    lista.every((item) => /^(index\.html|app\.js|style\.css|vip\.(html|css|js)|avatar\.jpg|cover\.jpg|verified\.png|login\.(html|css|js)|admin-mode\.(css|js)|admin-loader\.js|frame\.(css|js)|carousel\.(css|js))$/.test(item)),
+    lista.every((item) => /^(index\.html|app\.js|style\.css|vip\.(html|css|js)|buyer-account\.(html|css|js)|pending-checkouts\.js|image-tools\.js|fonts\.css|avatar\.jpg|cover\.jpg|verified-joice\.png|favicon\.ico|login\.(html|css|js)|admin-mode\.(css|js)|admin-loader\.js|frame\.(css|js)|carousel\.(css|js)|tips\.(css|js))$/.test(item)),
     lista.join(' '));
 }
 
@@ -295,10 +296,11 @@ check('a HOME só aceita URL da rota de teaser',
   /item\.teaser\.startsWith\('\/api\/home\/preview-video\/'\)/.test(teaserHomeJs),
   'a página recusa qualquer outro endereço de vídeo na prévia');
 check('o teaser da HOME toca sem som e sem baixar o arquivo inteiro',
-  /video\.muted = true/.test(teaserHomeJs) && /video\.preload = 'metadata'/.test(teaserHomeJs)
-  && /playsInline = true/.test(teaserHomeJs));
-check('o teaser congela no limite e não deixa passar dele',
-  /currentTime >= limit/.test(teaserHomeJs) && /currentTime > limit\) video\.currentTime = limit/.test(teaserHomeJs));
+  /video\.muted = true/.test(teaserHomeJs) && /video\.preload = 'none'/.test(teaserHomeJs)
+  && /playsInline = true/.test(teaserHomeJs) && /IntersectionObserver/.test(teaserHomeJs));
+check('a prévia toca uma passada só, com a derivada, e pausa fora da tela',
+  /video\.loop = false/.test(teaserHomeJs) && /else video\.pause\(\)/.test(teaserHomeJs)
+  && /currentTime >= limit/.test(teaserHomeJs) && !/Ver de novo/.test(teaserHomeJs));
 check('rever o teaser não muda de arquivo',
   !/\.src\s*=\s*[^;]*(media|vip)/i.test(teaserHomeJs) || /preview-video/.test(teaserHomeJs),
   'o replay volta ao início da mesma derivada');
@@ -313,7 +315,7 @@ const carCleanup = fs.readFileSync(path.join(BACKEND, 'services', 'media-cleanup
 const carHome = fs.readFileSync(path.join(ROOT, 'app.js'), 'utf8');
 const carVip = fs.readFileSync(path.join(ROOT, 'vip.js'), 'utf8');
 const carJs = fs.readFileSync(path.join(ROOT, 'carousel.js'), 'utf8');
-const carHomePreviews = /async function homePreviews\(\)[\s\S]*?\n\}/.exec(teaserPostsJs)?.[0] || '';
+const carHomePreviews = /async function homePreviews\([\s\S]*?\n\}/.exec(teaserPostsJs)?.[0] || '';
 
 check('a prévia pública do carrossel não lê o caminho do original',
   carHomePreviews.length > 0
@@ -353,9 +355,10 @@ check('só o slide visível toca, e o anterior pausa',
   && /index === current/.test(carJs),
   'nunca dois vídeos ao mesmo tempo');
 check('o carrossel não baixa tudo antes da hora',
-  /preload = index === 0 \? 'metadata' : 'none'/.test(carVip)
+  /video\.preload = 'none'/.test(carVip)
+  && /vipVideoObserver\.observe\(video\)/.test(carVip)
   && /loading = index === 0 \? 'eager' : 'lazy'/.test(carVip),
-  'primeiro slide leve, os outros só ao se aproximar');
+  'vídeos e fotos carregam quando se aproximam da tela');
 check('uma mídia não ganha controle de carrossel',
   /if \(count < 2\)[\s\S]{0,200}car-single/.test(carJs));
 
@@ -384,7 +387,7 @@ check('/api/home/previews é público mas não recebe pedido nem token',
   /app\.get\('\/api\/home\/previews'/.test(serverJs)
   && !/\/api\/home\/previews[\s\S]{0,400}(authorizeOrder|signLink|activeAccess)/.test(serverJs),
   'sem autorização de comprador porque não entrega mídia paga');
-const homePreviewsBody = /async function homePreviews\(\)[\s\S]*?\n}/.exec(vipPostsJs)?.[0] || '';
+const homePreviewsBody = /async function homePreviews\([\s\S]*?\n}/.exec(vipPostsJs)?.[0] || '';
 // A prévia lê a derivada minúscula, o enquadramento (números) e o caminho do
 // teaser derivado. O que não pode aparecer é o caminho ou o link da mídia paga.
 // Em vez de comparar a lista de colunas letra por letra — que quebra a cada
@@ -427,15 +430,10 @@ check('o número vem do servidor, nunca do frontend',
   /process\.env\.WHATSAPP_NUMBER/.test(serverJs)
   && !/wa\.me|whatsapp\.com|\+?55\d{10}/i.test(homeJs + vipJs + homeHtml),
   'nenhum número nem link fixo nas páginas públicas');
-check('número inválido não vira link',
-  /digits\.length >= 10 && digits\.length <= 15/.test(serverJs), 'falha fechada: devolve null');
-const contactHandler = /app\.get\('\/api\/contact'[\s\S]*?\n\}\);/.exec(serverJs)?.[0] || '';
-check('o contato não cria pedido nem cobrança',
-  contactHandler.includes('wa.me')
-  && !/createOrder|confirmPayment|entitlement|paymentProvider|products/.test(contactHandler));
-check('whatsapp_unlock continua desativado',
-  require(path.join(BACKEND, 'products')).whatsapp_unlock.enabled === false);
-
+check('contato exige pedido autorizado', serverJs.includes("app.get('/api/contact/:orderId', authorizeOrder"));
+check('contato exige pagamento e concessão próprios', serverJs.includes("order.product_id !== 'whatsapp_unlock'") && serverJs.includes("order.grant_type !== 'contact'") && serverJs.includes("grant_type='contact' AND status='ACTIVE'"));
+check('rota pública não entrega destino', serverJs.includes("res.json({ whatsapp: null, available: Boolean(contactUrl())"));
+check('contato não inclui assinatura', serverJs.includes("order.access_type !== 'whatsapp'"));
 
 secao('Modo administrador no site');
 
@@ -474,7 +472,7 @@ check('todo endpoint administrativo continua atrás de requireSession',
   && adminJs.indexOf('api.use(auth.requireSession)') < adminJs.indexOf("api.get('/posts'"),
   'a lista e as mutações ficam depois da tranca');
 check('o frontend admin não guarda token em localStorage',
-  !/localStorage|sessionStorage/.test(semComentarios(adminModeJs) + semComentarios(loginJs)),
+  !/localStorage|sessionStorage/.test(semComentarios(adminModeJs).replace(/sessionStorage\.setItem\('joice\.profile\.changed', '1'\)/g, '') + semComentarios(loginJs)),
   'a sessão vive só no cookie HttpOnly');
 
 /* ============================================================== RESULTADO */

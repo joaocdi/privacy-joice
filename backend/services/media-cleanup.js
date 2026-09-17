@@ -16,6 +16,16 @@ async function usable(db, path) {
  * do carrossel, o teaser de cada item, o avatar, a capa e o feed legado.
  */
 async function shared(db, path) {
+  // Preview uses the existing private bucket. A preview edit must never
+  // delete an object still referenced by the Production schema.
+  if (process.env.APP_ENV === 'staging' && process.env.DATABASE_URL) {
+    const productionReference = await db.get(`SELECT 1 AS used WHERE
+      EXISTS (SELECT 1 FROM public.vip_posts WHERE media_path=? OR preview_video=?) OR
+      EXISTS (SELECT 1 FROM public.vip_post_media WHERE media_path=? OR preview_video=?) OR
+      EXISTS (SELECT 1 FROM public.creator_profiles WHERE avatar_path=? OR cover_path=?)`,
+      path, path, path, path, path, path);
+    if (productionReference) return true;
+  }
   return Boolean(await db.get('SELECT id FROM vip_posts WHERE media_path=? LIMIT 1', path) ||
     // O teaser da HOME também é uma referência: se outra publicação ainda usa
     // aquele arquivo derivado, ele não pode sumir do Storage.

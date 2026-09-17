@@ -82,6 +82,7 @@ async function initDb() {
     CREATE UNIQUE INDEX IF NOT EXISTS checkout_hash_unique ON orders(checkout_hash);
     CREATE UNIQUE INDEX IF NOT EXISTS provider_payment_unique ON orders(payment_provider, provider_payment_id);`);
   await require('./grant-migrations').migrate(db);
+  await require('./account-migrations').migrate(db);
   return db;
 }
 

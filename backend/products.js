@@ -1,6 +1,7 @@
 const whatsappPrice = Number(process.env.WHATSAPP_PRICE || '7.90');
 if (!Number.isFinite(whatsappPrice) || whatsappPrice <= 0 || Math.round(whatsappPrice * 100) / 100 !== whatsappPrice) throw new Error('Invalid WHATSAPP_PRICE');
 const products = {
+  joice_tip: { id: 'joice_tip', name: 'Mimo', price: 5, type: 'tip', minCents: 500, maxCents: 1000000 },
   whatsapp_unlock: { id: 'whatsapp_unlock', name: 'Contato privado', price: whatsappPrice, type: 'one_time', get enabled() { return /^\d{10,15}$/.test((process.env.WHATSAPP_NUMBER || '').replace(/\D/g, '')); } },
   monthly: {
     id: "monthly",

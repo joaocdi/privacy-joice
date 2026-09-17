@@ -20,6 +20,28 @@ let likedPosts;
 try { likedPosts = new Set(JSON.parse(localStorage.getItem(LIKE_KEY) || '[]').map(String)); }
 catch (_) { likedPosts = new Set(); }
 let currentFeed = [];
+/**
+ * Mídia que não abre (arquivo ainda não enviado, link expirado, erro do
+ * Storage) vira um aviso curto no lugar do <img> quebrado. A moldura some:
+ * nada de área gigante vazia no meio do feed.
+ */
+function mediaUnavailable(cell, { draft }) {
+  if (cell.dataset.unavailable === '1') return;
+  cell.dataset.unavailable = '1';
+  cell.querySelectorAll('img, video, .vip-video-play').forEach(node => node.remove());
+  cell.classList.add('vip-media-missing');
+  const aviso = document.createElement('p');
+  aviso.className = 'vip-media-missing-text';
+  aviso.textContent = draft ? 'Mídia ainda não enviada.' : 'Mídia indisponível no momento.';
+  cell.append(aviso);
+}
+
+const vipVideoObserver = new IntersectionObserver(entries => {
+  for (const entry of entries) {
+    if (entry.isIntersecting) entry.target.preload = 'metadata';
+    else if (!entry.target.paused) entry.target.pause();
+  }
+}, { rootMargin: '200px 0px', threshold: 0 });
 let currentProfile = {};
 let returnFocus = null;
 
@@ -31,6 +53,7 @@ let returnFocus = null;
  * navegador nem vaza em Referer.
  */
 function readAccess() {
+  if(window.accountVipAccess)return window.accountVipAccess;
   const hash = new URLSearchParams(location.hash.slice(1));
   const orderId = hash.get('o');
   const token = hash.get('t');
@@ -87,7 +110,13 @@ async function adminPreview() {
 }
 
 (async function start() {
-  const access = readAccess();
+  let access = readAccess();
+  try { const r=await fetch('/api/buyer/account');const account=await r.json();if(account.enabled){
+    const order=account.orders?.find(o=>o.grant_type==='subscription'&&o.status==='ACTIVE'&&(!o.expires_at||Date.parse(o.expires_at.replace(' ','T')+'Z')>Date.now()));
+    // Existing pre-account purchases retain their server-validated credential.
+    access=order?{orderId:order.public_id,token:''}:access;
+    if(access)window.accountVipAccess=access;
+  }}catch(_){}
 
   if (!access) {
     const preview = await adminPreview();
@@ -189,6 +218,7 @@ function render(data) {
 }
 
 function renderFeed(filter) {
+  vipVideoObserver.disconnect();
   const feed = currentFeed.filter(post => post.type !== 'cta' && (filter === 'all' || post.type === filter));
   $('vipFeed').replaceChildren(...feed.map(post => buildPost(post, currentProfile)));
   $('vipEmpty').hidden = feed.length > 0;
@@ -273,17 +303,34 @@ function buildMediaPost(post, profile) {
   JoiceCarousel.build(box, items.map((item, index) => (cell) => {
     if (item.type === 'video') {
       const video = document.createElement('video');
+      video.addEventListener('error', () => mediaUnavailable(cell, { draft: post.draft }));
       video.src = API_BASE + item.media;
       video.controls = true;
       video.playsInline = true;
       // Só o primeiro pede metadados; os outros só quando chegam perto.
-      video.preload = index === 0 ? 'metadata' : 'none';
+      video.preload = 'none';
+      vipVideoObserver.observe(video);
       video.setAttribute('playsinline', '');
       video.setAttribute('controlsList', 'nodownload');
       cell.append(video);
+      const playButton = document.createElement('button');
+      playButton.type = 'button';
+      playButton.className = 'vip-video-play';
+      playButton.textContent = '▶';
+      playButton.setAttribute('aria-label', 'Reproduzir vídeo');
+      playButton.addEventListener('click', event => {
+        event.stopPropagation();
+        video.play().catch(() => { playButton.hidden = false; });
+      });
+      video.addEventListener('play', () => { playButton.hidden = true; });
+      video.addEventListener('pause', () => { playButton.hidden = false; });
+      video.addEventListener('ended', () => { playButton.hidden = false; });
+      cell.append(playButton);
       JoiceFrame.apply(video, item.crop, { box: cell });
     } else {
       const image = document.createElement('img');
+      image.decoding = 'async';
+      image.addEventListener('error', () => mediaUnavailable(cell, { draft: post.draft }));
       image.src = API_BASE + item.media;
       image.alt = post.caption || 'Foto exclusiva da Joice';
       image.loading = index === 0 ? 'eager' : 'lazy';
@@ -292,7 +339,10 @@ function buildMediaPost(post, profile) {
     }
   }), {
     // O vídeo que entra em cena volta a poder tocar; o que sai já foi pausado.
-    onEnter: video => { if (video.preload === 'none') video.preload = 'metadata'; }
+    onEnter: video => {
+      const bounds = video.getBoundingClientRect();
+      if (bounds.bottom >= -200 && bounds.top <= innerHeight + 200) video.preload = 'metadata';
+    }
   });
 
   article.append(box);
@@ -329,7 +379,13 @@ function buildActions(post) {
   like.addEventListener('click', async () => {
     if (post.realLikes) {
       const access = readAccess();
-      if (!access || like.disabled) return;
+      if (!access) {
+        // Modo revisão da criadora: não existe assinatura para registrar a curtida.
+        like.classList.remove('is-tapped'); void like.offsetWidth; like.classList.add('is-tapped');
+        notice('Modo revisão: as curtidas só contam quando um assinante toca no coração.');
+        return;
+      }
+      if (like.disabled) return;
       like.disabled = true;
       const previous = { count: realCount, liked: realLiked };
       realLiked = !realLiked; realCount += realLiked ? 1 : -1; update();
@@ -350,19 +406,28 @@ function buildActions(post) {
     update();
   });
   update();
-  // Só o ícone do cifrão, ao lado do coração. A contagem de curtidas fica.
-  const gift = document.createElement('button');
-  gift.type = 'button'; gift.className = 'vip-action vip-gift';
-  gift.title = 'Mandar mimo';
-  gift.setAttribute('aria-label', 'Mandar mimo');
-  gift.append(icon([
-    'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z',
-    'M14.8 9.3a2.6 2.6 0 0 0-2.4-1.3c-1.4 0-2.4.8-2.4 1.9 0 2.5 5 1.4 5 4 0 1.2-1.1 2-2.6 2a2.7 2.7 0 0 1-2.5-1.4',
-    'M12 6.2v1.8M12 16v1.8'
-  ]));
-  gift.addEventListener('click', () => openVipModal('gift'));
-  bar.append(like, gift);
+  const comment = document.createElement('button');
+  comment.type = 'button'; comment.className = 'vip-action vip-comment';
+  comment.disabled = true;
+  comment.title = 'Comentários indisponíveis';
+  comment.setAttribute('aria-label', 'Comentários indisponíveis');
+  comment.append(icon('M21 11.5a9 9 0 0 1-9 9 10 10 0 0 1-4-.9L3 21l1.4-4.8A9 9 0 1 1 21 11.5z'));
+  bar.append(like, comment);
   return bar;
+}
+
+/** Aviso curto no rodapé da tela (some sozinho). */
+function notice(text) {
+  let box = document.getElementById('vipNotice');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'vipNotice'; box.className = 'vip-notice'; box.setAttribute('role', 'status');
+    document.body.append(box);
+  }
+  box.textContent = text;
+  box.classList.add('is-visible');
+  clearTimeout(notice.timer);
+  notice.timer = setTimeout(() => box.classList.remove('is-visible'), 2600);
 }
 
 function action(pathData, label) {
@@ -394,77 +459,29 @@ function icon(pathData) {
 }
 
 function verifiedBadge() {
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('width', '12');
-  svg.setAttribute('height', '12');
-  svg.setAttribute('viewBox', '0 0 48 48');
-  svg.setAttribute('class', 'verified-icon');
-  svg.setAttribute('aria-label', 'Verificado');
-
-  const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-  polygon.setAttribute('fill', '#3B9BF0');
-  polygon.setAttribute('points', '29.62,3 33.05,8.31 39.37,8.62 39.69,14.94 45,18.37 42.12,24 45,29.63 39.69,33.06 39.37,39.38 33.05,39.69 29.62,45 24,42.12 18.38,45 14.95,39.69 8.63,39.38 8.31,33.06 3,29.63 5.88,24 3,18.37 8.31,14.94 8.63,8.62 14.95,8.31');
-
-  const check = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
-  check.setAttribute('fill', 'none');
-  check.setAttribute('points', '16.5,24.2 21.2,28.9 31.8,18.3');
-  check.setAttribute('stroke', '#fff');
-  check.setAttribute('stroke-width', '3.6');
-  check.setAttribute('stroke-linecap', 'round');
-  check.setAttribute('stroke-linejoin', 'round');
-
-  svg.append(polygon, check);
-  return svg;
+  const image = document.createElement('img');
+  image.src = '/verified-joice.png';
+  image.width = 14;
+  image.height = 14;
+  image.className = 'verified-icon';
+  image.alt = 'Verificado';
+  return image;
 }
 
 /* --------------------------------------------------------------- modal */
 
-function openVipModal(kind) {
-  returnFocus = document.activeElement;
-  $('vipModalTitle').textContent = kind === 'gift' ? 'Um carinho a mais.' : 'Mais perto, em breve.';
-  $('vipModalText').textContent = kind === 'gift'
-    ? 'A opção de mandar um mimo está sendo preparada com carinho. Por enquanto, seu coraçãozinho no post já deixa meu dia mais bonito.'
-    : 'O contato direto ainda não está disponível. Quando essa novidade chegar, você vai descobrir aqui no clube.';
-  $('vipModalOverlay').hidden = false;
-  document.body.style.overflow = 'hidden';
-  $('vipModalClose').focus();
-}
-function closeVipModal() {
-  $('vipModalOverlay').hidden = true;
-  document.body.style.overflow = '';
-  if (returnFocus?.isConnected) returnFocus.focus({ preventScroll: true });
-}
-/* ------------------------------------------------------- mimo e chat */
-
-/**
- * Mimo continua informativo: nenhum pedido, nenhuma cobrança.
- * Chat abre o WhatsApp da Joice quando o número estiver configurado no
- * servidor. O número nunca aparece neste arquivo.
- */
-let whatsappUrl = null;
-$('vipMimo')?.addEventListener('click', () => openVipModal('gift'));
-$('vipChat')?.addEventListener('click', () => {
-  if (whatsappUrl) return window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
-  openVipModal('chat');
-});
-(async function loadContact() {
+$('vipChat')?.addEventListener('click', async () => {
+  const button=$('vipChat');button.disabled=true;
   try {
-    const response = await fetch(API_BASE + '/api/contact', { signal: AbortSignal.timeout(8000) });
-    if (!response.ok) return;
-    const data = await response.json();
-    if (typeof data.whatsapp === 'string' && data.whatsapp.startsWith('https://')) whatsappUrl = data.whatsapp;
-  } catch (_) { /* sem contato configurado: o aviso do modal assume */ }
-})();
+    const response=await fetch('/api/buyer/account');const account=await response.json();
+    const owned=account.orders?.find(o=>o.grant_type==='contact'&&o.status==='ACTIVE');
+    if(!owned)return location.assign('/?buy=whatsapp_unlock');
+    const result=await fetch('/api/contact/'+encodeURIComponent(owned.public_id));const contact=await result.json();
+    if(!result.ok||!contact.whatsapp)throw Error('Não foi possível abrir seu WhatsApp.');
+    location.assign(contact.whatsapp);
+  }catch(_){location.assign('/meu-acesso');}finally{button.disabled=false;}
+});
 
-$('vipModalClose').addEventListener('click', closeVipModal);
-$('vipModalOverlay').addEventListener('click', (event) => {
-  if (event.target === $('vipModalOverlay')) closeVipModal();
-});
-document.addEventListener('keydown', event => {
-  if ($('vipModalOverlay').hidden) return;
-  if (event.key === 'Escape') closeVipModal();
-  if (event.key === 'Tab') { event.preventDefault(); $('vipModalClose').focus(); }
-});
 // Duas abas: a lista de publicações e a grade de mídias. Sem filtro de
 // foto/vídeo — o feed mostra tudo junto, como na página inicial.
 for (const [button, grid] of [[$('vipTabPosts'), false], [$('vipTabMedia'), true]]) {

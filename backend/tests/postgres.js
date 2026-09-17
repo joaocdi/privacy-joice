@@ -27,6 +27,8 @@ process.env.NODE_ENV = 'test';
 process.env.ENABLE_TELEGRAM_BOT = 'false';
 process.env.TELEGRAM_BOT_USERNAME = 'TestJoiceBot';
 process.env.FRONTEND_URL = 'http://localhost:5500';
+// O teste começa sem destino e só habilita a compra dentro do schema isolado.
+process.env.WHATSAPP_NUMBER = '';
 
 // Every test query is confined to a fresh schema, including transaction-pooler connections.
 const pg = require('pg');
@@ -166,6 +168,11 @@ async function main() {
   const products = require('../products');
   assert.equal(products.whatsapp_unlock.enabled, false, 'whatsapp_unlock continua desativado');
   assert.equal((await request('/api/payments/pix', { productId: 'whatsapp_unlock', checkoutToken: token })).status, 409);
+  process.env.WHATSAPP_NUMBER = '5548999990000';
+  assert.equal(products.whatsapp_unlock.enabled, true, 'um destino válido habilita a compra');
+  assert.equal((await request('/api/payments/pix', {
+    productId: 'whatsapp_unlock', checkoutToken: crypto.randomBytes(32).toString('hex'), client: { phone: '11999990000' }
+  })).status, 201);
 
   const { createOrder, updateOrderPayment } = require('../services/orders');
   const oneTime = await createOrder(products.whatsapp_unlock, crypto.randomBytes(32).toString('hex'), 'mock');

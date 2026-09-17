@@ -2,6 +2,7 @@
  * Diagnóstico isolado. Cria até quatro cobranças NÃO PAGAS no gateway.
  * Não importa app/provider/repository, não inicia servidor nem grava pedidos.
  * Execute: node backend/scripts/test-sigilopay-minimal.js
+ * Use --all para testar A/B/C/D independentemente de erro de validação em A.
  * Dados reais autorizados em backend/.env:
  * SIGILOPAY_TEST_NAME, SIGILOPAY_TEST_EMAIL, SIGILOPAY_TEST_PHONE
  * Credenciais/base/callback: mesmas variáveis da integração existente.
@@ -46,10 +47,10 @@ function redact(value, config) {
     [clean(key), /^(webhookToken|token|secret|secretKey|publicKey|authorization|x-secret-key|x-public-key)$/i.test(key) ? '[REDACTED]' : redact(item, config)]));
   return typeof value === 'string' ? clean(value) : value;
 }
-async function diagnose(config, fetchImpl = fetch, emit = value => console.log(JSON.stringify(value, null, 2))) {
+async function diagnose(config, fetchImpl = fetch, emit = value => console.log(JSON.stringify(value, null, 2)), options = {}) {
   const results = [];
   for (const variant of variants) {
-    if (variant.test > 1 && !results[0].accepted) {
+    if (!options.all && variant.test > 1 && !results[0].accepted) {
       const skipped = { test: variant.test, fields: variant.fields, document: false, http: null, result: 'Não executado: teste 1 não confirmou criação.' };
       results.push(skipped); emit(skipped); continue;
     }
@@ -83,7 +84,9 @@ if (require.main === module) {
   try {
     const env = dotenv.parse(fs.readFileSync(path.resolve(__dirname, '../.env')));
     const config = configuration(env);
-    diagnose(config).catch(() => { console.error('Diagnóstico interrompido; verifique cobranças de diagnóstico antes de repetir.'); process.exitCode = 1; });
+    // Explicit --all runs the four independent probes even after a validation error.
+    // Transport uncertainty still stops the run without retries.
+    diagnose(config, fetch, undefined, { all: process.argv.includes('--all') }).catch(() => { console.error('Diagnóstico interrompido; verifique cobranças de diagnóstico antes de repetir.'); process.exitCode = 1; });
   } catch (error) {
     // Configuration messages contain variable names only, never their values.
     console.error(error.code === 'ENOENT' ? 'backend/.env não encontrado.' : error instanceof TypeError ? 'URL inválida na configuração.' : error.message);

@@ -32,12 +32,12 @@
 const { execFileSync } = require('child_process');
 
 /** Alvo do teaser. Curto de propósito: é chamariz, não amostra grátis. */
-const SECONDS = 3;
+const SECONDS = 7;
 /** Folga para o MediaRecorder fechar o último quadro. */
-const MAX_SECONDS = 4.5;
+const MAX_SECONDS = 8.5;
 /** 240p. Acima disso deixa de ser derivada e começa a ser o conteúdo. */
 const MAX_HEIGHT = 380;
-/** ~3s de 240p desfocado cabe folgado aqui; o limite corta arquivo suspeito. */
+/** ~5s de 240p desfocado cabe folgado aqui; o limite corta arquivo suspeito. */
 const MAX_BYTES = 3 * 1024 * 1024;
 const MIME = { 'video/webm': 'webm', 'video/mp4': 'mp4' };
 

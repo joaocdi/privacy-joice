@@ -22,7 +22,7 @@ function customerColumns(client) {
   };
 }
 
-async function createOrder(product, checkoutToken, provider, client = null) {
+async function createOrder(product, checkoutToken, provider, client = null, buyerId = null) {
   // Catalog/server metadata only; no resource or grant scope comes from checkout.
   const grantType = product.type === 'ppv' ? 'ppv' : product.type === 'one_time' ? 'contact' : 'subscription';
   const resourceType = grantType === 'ppv' ? product.resourceType : null;
@@ -32,7 +32,7 @@ async function createOrder(product, checkoutToken, provider, client = null) {
     const checkoutHash = hash(checkoutToken);
     const existing = await db.get('SELECT * FROM orders WHERE checkout_hash = ?', checkoutHash);
     if (existing) {
-      if (existing.product_id !== product.id) throw Object.assign(new Error('Checkout já pertence a outro produto.'), { status: 409 });
+      if (existing.product_id !== product.id || (product.type === 'tip' && Math.round(existing.amount * 100) !== Math.round(product.price * 100))) throw Object.assign(new Error('Checkout já pertence a outro produto.'), { status: 409 });
       return { ...existing, fresh: false };
     }
     const id = 'ord_' + crypto.randomBytes(24).toString('hex');
@@ -47,19 +47,42 @@ async function createOrder(product, checkoutToken, provider, client = null) {
     if (!inserted.changes) {
       const raced = await db.get('SELECT * FROM orders WHERE checkout_hash = ?', checkoutHash);
       if (!raced) throw new Error('Checkout não persistido.');
-      if (raced.product_id !== product.id) throw Object.assign(new Error('Checkout já pertence a outro produto.'), { status: 409 });
+      if (raced.product_id !== product.id || (product.type === 'tip' && Math.round(raced.amount * 100) !== Math.round(product.price * 100))) throw Object.assign(new Error('Checkout já pertence a outro produto.'), { status: 409 });
       return { ...raced, fresh: false };
     }
+    await db.run("UPDATE orders SET creation_phase='ready' WHERE public_id=?", id);
+    if(product.type === 'tip') await db.run("UPDATE orders SET purchase_kind='tip',access_type='tip',purchase_buyer_id=? WHERE public_id=?",buyerId,id);
+    if(process.env.BUYER_ACCOUNT_FLOW === 'true' && product.type !== 'tip') await db.run('UPDATE orders SET claim_required=1,claim_token_hash=?,purchase_buyer_id=? WHERE public_id=?',checkoutHash,buyerId,id);
     return { ...await db.get('SELECT * FROM orders WHERE public_id = ?', id), fresh: true };
   });
 }
 async function getOrderByPublicId(id) { return (await getDb()).get('SELECT * FROM orders WHERE public_id = ?', id); }
 async function updateOrderPayment(id, payment) {
-  await (await getDb()).run("UPDATE orders SET status='PENDING', provider_payment_id=?, pix_copy_paste=?, pix_qr_code=?, webhook_token_hash=? WHERE public_id=? AND status='CREATING'",
-    payment.providerPaymentId, payment.pix.copyPaste, payment.pix.qrCode, hash(payment.webhookToken), id);
+  const result = await (await getDb()).run("UPDATE orders SET status='PENDING', creation_phase='complete', provider_payment_id=?, pix_copy_paste=?, pix_qr_code=?, webhook_token_hash=? WHERE public_id=? AND (status='CREATING' OR (status='FAILED' AND creation_phase='uncertain'))",
+    payment.providerPaymentId, payment.pix.copyPaste, payment.pix.qrCode, payment.webhookToken ? hash(payment.webhookToken) : null, id);
+  if (!result.changes) throw new Error('Payment persistence rejected');
+}
+// Claim before contacting the provider. A competing request may read the order,
+// but only this atomic transition authorizes an outbound cash-in request.
+async function beginPaymentCreation(id) {
+  const result = await (await getDb()).run("UPDATE orders SET status='CREATING',creation_phase='requested',creation_started_at=? WHERE public_id=? AND provider_payment_id IS NULL AND pix_copy_paste IS NULL AND ((status='CREATING' AND creation_phase='ready') OR (status='FAILED' AND creation_phase='retryable'))", Date.now(), id);
+  return Boolean(result.changes);
+}
+async function failPaymentCreation(id, safeToRetry) {
+  await (await getDb()).run("UPDATE orders SET status='FAILED',creation_phase=? WHERE public_id=? AND status='CREATING' AND creation_phase='requested'", safeToRetry ? 'retryable' : 'uncertain', id);
+}
+const CREATION_TIMEOUT_MS = 120000;
+async function recoverCreation(order) {
+  if (!order || order.status !== 'CREATING' || order.creation_phase === 'ready') return order;
+  const started = order.creation_started_at == null
+    ? Date.parse(String(order.created_at).replace(' ', 'T') + 'Z') : Number(order.creation_started_at);
+  if (!Number.isFinite(started) || Date.now() - started < CREATION_TIMEOUT_MS) return order;
+  // A timeout does not prove cash-in failed. Never replay an ambiguous request.
+  await (await getDb()).run("UPDATE orders SET status='FAILED',creation_phase='uncertain' WHERE public_id=? AND status='CREATING' AND creation_phase=? AND COALESCE(creation_started_at,0)=?", order.public_id, order.creation_phase, Number(order.creation_started_at) || 0);
+  return getOrderByPublicId(order.public_id);
 }
 async function updateOrderStatus(id, status) {
   if (!['FAILED', 'EXPIRED', 'CANCELED'].includes(status)) throw new Error('Use confirmPayment for approval');
   await (await getDb()).run("UPDATE orders SET status=? WHERE public_id=? AND status IN ('CREATING','PENDING')", status, id);
 }
-module.exports = { createOrder, getOrderByPublicId, updateOrderPayment, updateOrderStatus };
+module.exports = { createOrder, getOrderByPublicId, updateOrderPayment, updateOrderStatus, beginPaymentCreation, failPaymentCreation, recoverCreation, CREATION_TIMEOUT_MS };

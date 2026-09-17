@@ -45,7 +45,7 @@ async function contract(db) {
     await db.run("UPDATE creator_profiles SET avatar_path='joice/posts/avatar.jpg' WHERE id='joice'");
     check((await posts.deletePermanent('crop-profile-ref',1)).storage==='shared');check(!removed.includes('joice/posts/avatar.jpg'));
   } finally {media.removePrivate=originalRemove;}
-  const fs=require('fs'),path=require('path');check(fs.readFileSync(path.resolve(__dirname,'../../style.css'),'utf8').includes('blur(6.6px)'));
+  const fs=require('fs'),path=require('path');check(fs.readFileSync(path.resolve(__dirname,'../../style.css'),'utf8').includes('blur(10px)'));
   const f=require('../../frame');const g=f.geometry({x:100,y:0,zoom:2},400,800,200,200);check(g.left<=0&&g.top===0&&g.width>=200&&g.height>=200);
   console.log(`PASS crop/delete: ${checks} checks (validation, profile/post persistence, matching public/VIP crop, archive/restore, shared media, cleanup failure/retry)`);
 }

@@ -63,6 +63,7 @@ function install(app) {
   }));
 
   api.use(auth.requireSession);
+  api.get('/conversions', wrap(async (req,res)=>res.json(await require('./services/conversions').summary())));
   api.get('/profile', wrap(async (req, res) => res.json(await profile.get())));
   api.put('/profile', wrap(async (req, res) => res.json(await profile.save(req.body, req.admin.id))));
   api.get('/session', (req, res) => res.json({ csrf: auth.csrf(auth.token(req)), uploadMaxBytes: uploads.maxSize(), storage: media.driverName() }));

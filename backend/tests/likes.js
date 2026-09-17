@@ -90,7 +90,7 @@ async function main() {
       assert.equal(await page.locator('.vip-like').count(),1,'carousel has one heart');
       await advance();
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
-      await page.goto(base+'/'); await page.waitForSelector('.preview-post[data-post-id="like-qa"]');
+      await page.goto(base+'/'); await page.locator('#ageConfirm').click(); await page.waitForSelector('.preview-post[data-post-id="like-qa"]');
       assert.ok((await page.locator('.preview-engagement').first().textContent()).includes('318'));
       assert.equal(await page.locator('#btnMimo').count(),0);
       assert.ok(!(await page.locator('body').innerText()).includes('Mimo'));

@@ -8,6 +8,16 @@
  *
  * Rodar localmente continua igual: `npm start` dentro de backend/.
  */
+// Each Vercel Preview has its own trusted origin. Never derive this from
+// an incoming Host header, and never override the Production configuration.
+if (process.env.VERCEL_ENV === 'preview') {
+  const host = process.env.VERCEL_URL;
+  if (!/^[a-z0-9-]+\.vercel\.app$/.test(host || '')) throw new Error('Preview URL unavailable');
+  const origin = 'https://' + host;
+  process.env.PUBLIC_APP_URL = origin;
+  process.env.FRONTEND_URL = origin;
+  process.env.ADMIN_ORIGIN = origin;
+}
 const { app, ready } = require('../backend/server');
 
 module.exports = async (req, res) => {

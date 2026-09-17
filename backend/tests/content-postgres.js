@@ -32,7 +32,27 @@ async function main() {
   process.env.VIP_MEDIA_SECRET = crypto.randomBytes(32).toString('hex');
   await require('./buyer-recovery')(db);
   await require('./grant-scope')();
+  // Tips are paid receipts without any access entitlement, also on PostgreSQL.
+  const tipProduct=Object.values(require('../products')).find(p=>p.type==='tip');
+  const tipOrder=await require('../services/orders').createOrder({...tipProduct,price:5.37},crypto.randomBytes(32).toString('hex'),'mock');
+  await require('../services/orders').updateOrderPayment(tipOrder.public_id,await require('../payments/mock-provider').createPixPayment({orderId:tipOrder.public_id}));
+  await require('../services/entitlements').confirmPayment(tipOrder.public_id);
+  await require('../services/entitlements').confirmPayment(tipOrder.public_id);
+  assert.equal((await db.get('SELECT purchase_kind FROM orders WHERE id=?',tipOrder.id)).purchase_kind,'tip');
+  assert.equal((await db.get('SELECT COUNT(*) AS n FROM entitlements WHERE order_id=?',tipOrder.id)).n,0);
+
   await require('./profile-contract')(db);
+  const orderService = require('../services/orders');
+  const recovery = await orderService.createOrder(require('../products').monthly, crypto.randomBytes(32).toString('hex'), 'mock');
+  const ownership = await Promise.all([orderService.beginPaymentCreation(recovery.public_id), orderService.beginPaymentCreation(recovery.public_id)]);
+  assert.equal(ownership.filter(Boolean).length, 1, 'Postgres compare-and-set has one winner');
+  await db.run('UPDATE orders SET creation_started_at=? WHERE public_id=?', Date.now() - 180000, recovery.public_id);
+  const stalled = await orderService.recoverCreation(await orderService.getOrderByPublicId(recovery.public_id));
+  assert.equal(stalled.creation_phase, 'uncertain'); assert.equal(stalled.status, 'FAILED');
+  assert.equal(await orderService.beginPaymentCreation(recovery.public_id), false);
+  await orderService.updateOrderPayment(recovery.public_id, { providerPaymentId:'pg-recovery', pix:{copyPaste:'fixture',qrCode:'fixture'} });
+  assert.equal((await orderService.getOrderByPublicId(recovery.public_id)).status, 'PENDING');
+  console.log('PASS PostgreSQL creation recovery: atomic dispatch, stalled request, no replay, late persistence');
   const now = Date.now();
   await db.run("INSERT INTO orders(public_id,product_id,amount) VALUES ('pg-cms-order','monthly',9.9)");
   const order = await db.get("SELECT * FROM orders WHERE public_id='pg-cms-order'");

@@ -18,7 +18,7 @@
  */
 
 const MAX_BYTES = 24 * 1024;
-const MAX_EDGE = 96;
+const MAX_EDGE = 200;
 
 /**
  * Lê largura/altura direto do cabeçalho SOF do JPEG.

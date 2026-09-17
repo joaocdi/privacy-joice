@@ -14,7 +14,10 @@ function present(row) {
     avatar: '/api/profile/media/avatar?v=' + (row?.version || 0),
     cover: '/api/profile/media/cover?v=' + (row?.version || 0), version: row?.version || 0 };
 }
-async function get() { return present(await read()); }
+async function get() {
+  // HOME and VIP share the configured profile counters.
+  return present(await read());
+}
 async function save(body, sessionId) {
   for (const [key, max] of [['name',80], ['username',80], ['bio',4000]]) {
     if (typeof body[key] !== 'string' || body[key].length > max || (key !== 'bio' && !body[key].trim())) throw fail('Preencha nome, username e bio dentro dos limites.', 400);
@@ -50,6 +53,6 @@ async function save(body, sessionId) {
 async function image(role) {
   if (!['avatar','cover'].includes(role)) throw fail('Imagem não encontrada.', 404);
   const row = await read();
-  return { path: row?.[role + '_path'] || null, fallback: defaults[role] };
+  return { path: row?.[role + '_path'] || null, fallback: defaults[role], version: row?.version || 0 };
 }
 module.exports = { get, save, image };

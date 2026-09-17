@@ -1364,7 +1364,7 @@ body { background: #f7f7f7; }
 .preview-post .locked-post,
 .preview-post:nth-of-type(3n+2) .locked-post,
 .preview-post:nth-of-type(3n) .locked-post { height: 360px; background: #f3f3f3; }
-.locked-img { filter: blur(6.6px) saturate(1.08); transform: scale(1.12); }
+.locked-img { filter: blur(10px) saturate(1.08); transform: scale(1.12); }
 
 /* ------------------------------------------------------- teaser de vídeo */
 /* O arquivo que toca aqui JÁ vem desfocado e em baixa resolução do servidor.
@@ -1916,7 +1916,7 @@ body.age-pending > :not(#ageGate):not(script) { visibility:hidden !important; }
 
 /* Public derivatives remain protected even with all styles disabled. */
 .locked-post, .preview-post .locked-post, .preview-post:nth-of-type(3n+2) .locked-post, .preview-post:nth-of-type(3n) .locked-post { background:#111; aspect-ratio:4/5; height:auto; }
-.locked-img { object-fit:cover; filter:blur(20px) saturate(1.1); transform:scale(1.2); }
+.locked-img { object-fit:cover; filter:blur(10px) saturate(1.1); transform:scale(1.2); }
 .locked-overlay, .has-teaser .locked-overlay { background:linear-gradient(180deg,rgba(0,0,0,.35),rgba(0,0,0,.55)); }
 .lock-icon { background:transparent; border:0; width:40px; height:40px; backdrop-filter:none; }
 .lock-icon svg { width:36px; height:36px; color:#fff; }

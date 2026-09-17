@@ -43,13 +43,7 @@ async function derive(file) {
       source = image; width = image.naturalWidth; height = image.naturalHeight;
     }
     if (!width || !height) throw new Error('Mídia sem dimensões legíveis.');
-    const canvas = document.createElement('canvas');
-    canvas.width = PREVIEW_WIDTH; canvas.height = PREVIEW_HEIGHT;
-    const scale = Math.max(canvas.width / width, canvas.height / height);
-    const drawWidth = width * scale;
-    const drawHeight = height * scale;
-    canvas.getContext('2d').drawImage(source, (canvas.width - drawWidth) / 2, (canvas.height - drawHeight) / 2, drawWidth, drawHeight);
-    return canvas.toDataURL('image/jpeg', 0.55);
+    return JoiceImageTools.preview(source, width, height);
   } finally { URL.revokeObjectURL(url); }
 }
 async function api(route, method = 'GET', body, headers = {}) {
@@ -169,6 +163,7 @@ $('file').addEventListener('change', async () => {
   }
 });
 async function sendFile(file, state = { upload }, progressId = 'progress', messageId = 'editorMessage') {
+  file = await JoiceImageTools.post(file);
   let upload = state.upload;
   if (file.size > maximum) throw new Error(`Arquivo acima do limite de ${Math.round(maximum / 1024 / 1024)} MB.`);
   if (!upload) upload = await api('/uploads', 'POST', { size: file.size, mime: file.type });
@@ -250,10 +245,12 @@ $('profileForm').addEventListener('submit', async event => {
   try {
     for (const role of ['Avatar','Cover']) {
       const file = $('profile' + role + 'File').files[0];
-      if (file) body[role.toLowerCase() + 'UploadId'] = await sendFile(file, profileUploads[role.toLowerCase()], 'profileProgress', 'profileMessage');
+      if (file) body[role.toLowerCase() + 'UploadId'] = await sendFile(await JoiceImageTools.profile(file, role.toLowerCase()), profileUploads[role.toLowerCase()], 'profileProgress', 'profileMessage');
     }
     await api('/profile', 'PUT', body); await loadProfile();
     $('profileMessage').textContent = 'Perfil salvo. HOME e VIP usarão estes dados ao abrir ou atualizar a página.';
   } catch (error) { $('profileMessage').textContent = error.message; }
   finally { uploading = false; controls.forEach(el => el.disabled = false); $('profileProgress').hidden = true; }
 });
+
+(async()=>{const target=document.getElementById('conversionReport');try{const r=await fetch('/api/admin/conversions');if(!r.ok)throw Error();const data=await r.json();target.textContent='';const note=document.createElement('p');note.textContent=['mock','staging'].includes(data.mode)?'Modo simulado: não representa vendas reais.':'Pagamentos reais';target.append(note);for(const item of data.products){const p=document.createElement('p');p.textContent=item.id+': '+item.opened+' aberturas · '+item.generated+' PIX gerados · '+item.paid+' pagos · '+item.linked+' acessos vinculados · '+item.awaitingClaim+' aguardando cadastro · '+item.whatsappClicks+' cliques WhatsApp';target.append(p);}if(data.reviewOrders?.length){const title=document.createElement('h3');title.textContent='Pedidos que precisam de verificação';target.append(title);for(const order of data.reviewOrders){const row=document.createElement('p');row.style.overflowWrap='anywhere';row.textContent=order.public_id+' · '+order.product_id+' · '+Number(order.amount).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})+' · '+order.created_at;target.append(row);}}}catch(_){target.textContent='Métricas indisponíveis. Atualize para tentar novamente.';}})();

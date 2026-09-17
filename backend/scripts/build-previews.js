@@ -23,8 +23,8 @@ sources.forEach((relative, index) => {
     '-hide_banner', '-loglevel', 'error', '-y',
     ...(relative.endsWith('.mp4') ? ['-ss', '1'] : []), '-i', source,
     '-frames:v', '1', '-an', '-map_metadata', '-1',
-    '-vf', 'scale=120:150:force_original_aspect_ratio=increase,crop=120:150,gblur=sigma=6:steps=3,scale=480:600:flags=bicubic',
-    '-q:v', '4', target
+    '-vf', 'scale=192:240:force_original_aspect_ratio=increase,crop=160:200,gblur=sigma=2:steps=3',
+    '-q:v', '6', target
   ], { stdio: 'pipe' });
   console.log(path.relative(root, target));
 });

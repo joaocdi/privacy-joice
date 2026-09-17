@@ -156,6 +156,10 @@ async function main() {
   check((await db.get('SELECT media_path FROM vip_posts WHERE id=?', id)).media_path === caminhos.foto1,
     'as colunas antigas espelham o item 1');
 
+  const retried = await request('/api/admin/posts', {method:'POST', body:{...base_,items:[{uploadId:foto1,preview_image:tinyJpeg(),crop:JSON.parse(itens[0].crop_data)},{uploadId:foto2,preview_image:tinyJpeg(),crop:JSON.parse(itens[1].crop_data)},{uploadId:video1,preview_image:tinyJpeg(),crop:JSON.parse(itens[2].crop_data)}]}});
+  check(retried.status===201,'repetir envio do carrossel funciona');
+  check((await db.all('SELECT id FROM vip_post_media WHERE post_id=? ORDER BY sort_order',id)).every((p,i)=>p.id===itens[i].id),'retry preserva os IDs existentes e não apaga mídias');
+
   /* ============================ 3. O QUE O VISITANTE RECEBE DE UM CARROSSEL */
 
   const home = await request('/api/home/previews', { authenticated: false });

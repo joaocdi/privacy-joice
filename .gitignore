@@ -31,3 +31,22 @@ routes_bundle.js
 /backend.env
 /_snapshots/
 /public/
+
+.env*
+
+# Atalho local de publicacao
+publicar.bat
+node_modules/
+.vercel/
+.audit/
+backend/.test-runs/
+
+.env
+.env.*
+!.env.example
+
+backend/.env
+backend/.env.*
+!backend/.env.example
+
+*.log

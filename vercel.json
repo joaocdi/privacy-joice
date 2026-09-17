@@ -2,18 +2,62 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
   "outputDirectory": "public",
-  "buildCommand": "node -e \"const fs=require('fs');fs.mkdirSync('public',{recursive:true});fs.copyFileSync('verified.png','public/verified.png')\"",
+  "buildCommand": "node -e \"const fs=require('fs');fs.mkdirSync('public',{recursive:true});fs.copyFileSync('verified-joice.png','public/verified-joice.png');fs.cpSync('fonts','public/fonts',{recursive:true})\"",
   "installCommand": "npm ci --prefix backend --omit=dev --omit=optional",
   "functions": {
     "api/index.js": {
       "maxDuration": 30,
-      "includeFiles": "{index.html,app.js,style.css,vip.html,vip.css,vip.js,avatar.jpg,cover.jpg,verified.png,frame.js,frame.css,carousel.js,carousel.css,admin-mode.js,admin-mode.css,admin-loader.js,login.html,login.js,login.css,previews/*.jpg,backend/**}"
+      "includeFiles": "{*.html,*.js,*.css,avatar.jpg,cover.jpg,verified-joice.png,favicon.ico,previews/*.jpg,backend/**}"
     }
   },
   "rewrites": [
-    { "source": "/(.*)", "destination": "/api/index" }
+    {
+      "source": "/(.*)",
+      "destination": "/api/index"
+    }
   ],
   "crons": [
-    { "path": "/api/jobs/expire", "schedule": "0 3 * * *" }
+    {
+      "path": "/api/jobs/expire",
+      "schedule": "0 3 * * *"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/fonts/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/:asset(app.js|style.css|frame.js|frame.css|carousel.js|carousel.css|fonts.css|image-tools.js|pending-checkouts.js|vip.js|vip.css|buyer-account.js|buyer-account.css|admin-loader.js|admin-mode.js|admin-mode.css)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/:asset(avatar.jpg|cover.jpg|verified-joice.png|favicon.ico)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, stale-while-revalidate=86400"
+        }
+      ]
+    },
+    {
+      "source": "/previews/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, stale-while-revalidate=86400"
+        }
+      ]
+    }
   ]
 }

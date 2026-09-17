@@ -21,13 +21,13 @@
     media._cropValue=crop;
     const draw=()=>{
       const c=media._cropValue,w=media.naturalWidth||media.videoWidth||4,h=media.naturalHeight||media.videoHeight||5;
-      box.style.aspectRatio=String(ratio(c,w,h));
+      box.style.aspectRatio=String(options.preview ? 4/5 : ratio(c,w,h));
       if(options.role!=='avatar') {box.style.height='auto';box.style.minHeight='0';}
       const g=geometry(c,w,h,box.clientWidth,box.clientHeight);
       for(const [k,v]of Object.entries(g))media.style.setProperty(k,v+'px','important');
       media.style.setProperty('position','absolute','important');
       media.style.setProperty('max-width','none','important');media.style.setProperty('max-height','none','important');
-      media.style.setProperty('transform','none','important');media.style.setProperty('border-radius','0','important');
+      media.style.setProperty('transform',options.preview && media.tagName==='IMG'?'scale(1.2)':'none','important');media.style.setProperty('border-radius','0','important');
       media.style.setProperty('object-fit','fill','important');
     };
     if(media._cropDraw)media._cropObserver?.disconnect();
@@ -60,7 +60,11 @@
       value.x=Math.max(0,Math.min(100,drag.crop.x-(e.clientX-drag.x)/Math.max(1,g.width-viewport.clientWidth)*100));
       value.y=Math.max(0,Math.min(100,drag.crop.y-(e.clientY-drag.y)/Math.max(1,g.height-viewport.clientHeight)*100));draw();});
     for(const event of ['pointerup','pointercancel','lostpointercapture'])viewport.addEventListener(event,()=>drag=null);
-    function setSource(next,nextType=type){element?._cropObserver?.disconnect();viewport.replaceChildren();element=document.createElement(nextType==='video'?'video':'img');
+    function setSource(next,nextType=type){element?._cropObserver?.disconnect();viewport.replaceChildren();
+      // Sem arquivo ainda: aviso curto, nunca <img src=""> (ícone quebrado).
+      if(!next){element=null;const vazio=document.createElement('p');vazio.className='crop-editor-empty';
+        vazio.textContent='Escolha um arquivo para enquadrar.';viewport.append(vazio);return;}
+      element=document.createElement(nextType==='video'?'video':'img');
       element.alt=label;element.draggable=false;if(nextType==='video'){element.muted=true;element.playsInline=true;element.preload='metadata';}
       element.src=next;viewport.append(element);draw();}
     setSource(src,type);

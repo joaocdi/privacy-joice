@@ -19,3 +19,6 @@ _snapshots/
 clone.html
 site_source.html
 routes_bundle.js
+*.bak
+# Atalhos locais de publicacao
+*.bat

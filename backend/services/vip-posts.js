@@ -42,18 +42,24 @@ async function list() {
  * Devolve SOMENTE a derivada minúscula e a legenda. `media_path` nunca sai
  * daqui: o visitante não é assinante e não recebe nada que leve ao original.
  */
-async function homePreviews() {
+async function homePreviews({ limit = MAX_HOME_PREVIEWS, offset = 0 } = {}) {
   if (await source() !== 'managed') return [];
   const db = await getDb();
   const rows = await db.all(`SELECT id,type,caption,preview_image,crop_data,preview_video,likes_count,
     (SELECT COUNT(*) FROM vip_post_likes l WHERE l.post_id=vip_posts.id) AS likes FROM vip_posts
     WHERE creator_id='joice' AND published=1 AND archived=0 AND show_as_preview=1 AND preview_image IS NOT NULL AND preview_image<>''
     ORDER BY sort_order,created_at,id`);
-  const chosen = rows.slice(0, MAX_HOME_PREVIEWS);
+  // Página do feed público: o visitante recebe as primeiras e busca o resto
+  // ao chegar perto do fim. O teto continua sendo MAX_HOME_PREVIEWS.
+  const start = Math.max(0, Math.min(Number(offset) || 0, MAX_HOME_PREVIEWS));
+  const size = Math.max(1, Math.min(Number(limit) || MAX_HOME_PREVIEWS, MAX_HOME_PREVIEWS));
+  const disponiveis = rows.slice(0, MAX_HOME_PREVIEWS);
+  const chosen = disponiveis.slice(start, start + size);
+  const total = disponiveis.length;
   // `fallback: false`: esta função responde ao VISITANTE e por isso não lê,
   // nem indiretamente, o caminho do arquivo original.
   const byPost = await postMedia.listForMany(db, chosen, { fallback: false });
-  return chosen.map(row => {
+  const montados = chosen.map(row => {
     // Um item por mídia, cada um com a SUA derivada. A foto entrega a amostra
     // minúscula embutida; o vídeo entrega a rota do teaser dele. Em nenhum
     // caso sai caminho de arquivo original ou link assinado.
@@ -77,6 +83,8 @@ async function homePreviews() {
       items
     };
   });
+  // `total` deixa o navegador saber se ainda há página para buscar.
+  return Object.assign(montados, { total });
 }
 /**
  * O caminho do teaser de UMA publicação, para a rota pública da HOME.
@@ -397,6 +405,9 @@ async function migrate() {
  */
 async function adoptLegacyOnce() {
   const db = await getDb();
+  // Depois que o painel assume o feed, NUNCA reimportar: sem isto, apagar
+  // a última publicação fazia o feed antigo voltar no próximo boot.
+  if (await source(db) === 'managed') return { imported: 0, switched: false, reason: 'o feed já é gerenciado pelo painel' };
   const existing = await db.get("SELECT COUNT(*) AS n FROM vip_posts WHERE creator_id='joice'");
   if (Number(existing.n) > 0) return { imported: 0, switched: false, reason: 'já existem publicações no banco' };
   const imported = await migrate();

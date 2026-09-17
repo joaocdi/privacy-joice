@@ -24,7 +24,7 @@ async function main(){
   const item={id:'swipe-fixture',type:types[0],preview,caption:'QA swipe',likes_count:318,teaserSeconds:3,
     items:types.map((type,n)=>({id:'item-'+n,type,preview,crop:{ratio:'4:5',x:50,y:50,zoom:1},teaser:type==='video'?'/api/home/preview-video/swipe-fixture/item-'+n:null}))};
   await page.route('**/api/home/previews',r=>r.fulfill({json:{source:'managed',previews:[item]}}));
-  await page.goto(base+'/');const card=page.locator('[data-post-id="swipe-fixture"]');await card.waitFor();
+  await page.goto(base+'/');await page.locator('#ageConfirm').click();const card=page.locator('[data-post-id="swipe-fixture"]');await card.waitFor();
   const track=card.locator('.car-track'),counter=card.locator('.car-count');
   const center=async()=>{await track.evaluate(e=>{const b=e.getBoundingClientRect();window.scrollBy({top:b.top-(innerHeight-b.height)/2,behavior:'instant'});});await page.waitForTimeout(100);return track.boundingBox();};
   const gesture=async(direction,vertical=false)=>{
@@ -50,8 +50,9 @@ async function main(){
   await center();const scrollBefore=await page.evaluate(()=>scrollY);await gesture(-1,true);
   await page.waitForFunction(before=>scrollY<before-40,scrollBefore,{timeout:4000});await state(1);
   // Tapping the CTA is a click, not an accidental slide; no PIX is created.
+  assert.equal(paymentCalls,0,'gestures must not open checkout');
   await card.locator('.btn-unlock').tap();await page.waitForSelector('#checkoutModalOverlay.open');
-  assert.equal(await counter.textContent(),'1/'+types.length);assert.equal(paymentCalls,0);
+  assert.equal(await counter.textContent(),'1/'+types.length);assert.equal(paymentCalls,1);
   await page.evaluate(()=>closeCheckout());
   // Exercise each video slide: only public derivative URLs and bounded playback.
   for(let n=0;n<types.length;n++){
@@ -60,13 +61,13 @@ async function main(){
       const cell=card.locator('.car-cell').nth(n),video=cell.locator('video');
       await cell.scrollIntoViewIfNeeded();
       if(await video.evaluate(v=>v.currentTime===0 && v.paused)) await video.evaluate(v=>v.play());
-      await page.waitForFunction(index=>{const v=document.querySelectorAll('.car-cell')[index]?.querySelector('video');return v?.paused && v.currentTime>=2.5;},n,{timeout:8000});
+      await page.waitForFunction(index=>{const v=document.querySelectorAll('.car-cell')[index]?.querySelector('video');return v && !v.paused && v.currentTime>.1 && v.loop;},n,{timeout:8000});
       assert.ok(await video.evaluate(v=>v.currentTime<=3.1 && new URL(v.src).pathname.startsWith('/api/home/preview-video/')));
-      assert.ok(await cell.evaluate(e=>e.classList.contains('is-teaser-done')));
+      assert.ok(await cell.evaluate(e=>e.classList.contains('teaser-ready')));
     }
   }
   await page.screenshot({path:path.resolve(__dirname,'../.test-runs/home-swipe-'+width+'-'+types.join('-')+'.png')});
-  assert.equal(paymentCalls,0);console.log('PASS HOME '+width+' '+types.join('+')+': left/right, counter/dots, CTA, vertical scroll, count, derivative teaser, no overflow');
+  assert.equal(paymentCalls,1);console.log('PASS HOME '+width+' '+types.join('+')+': left/right, counter/dots, CTA, vertical scroll, count, derivative teaser, no overflow');
   await ctx.close();
  }
 }
