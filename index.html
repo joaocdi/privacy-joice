@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <style>html{background:#f4f3f1}</style>
-  <script>try{document.documentElement.dataset.age=sessionStorage.getItem('joice.age.confirmed')==='yes'?'ok':'ask';}catch(e){document.documentElement.dataset.age='ask';}</script>
+  <script>/* 18+: lembrado no aparelho, com versão na chave. */try{var a=localStorage.getItem('age_gate_confirmed_v1')==='1'||sessionStorage.getItem('joice.age.confirmed')==='yes';document.documentElement.dataset.age=a?'ok':'ask';if(a)localStorage.setItem('age_gate_confirmed_v1','1');}catch(e){document.documentElement.dataset.age='ask';}</script>
   <style>
   /* Crítico: a tela 18+ pinta junto com o HTML, sem esperar o style.css. */
   body.age-pending{overflow:hidden}
@@ -24,6 +24,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#ffffff" />
   <title>Joice — um lado só nosso</title>
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Joice">
+  <meta property="og:locale" content="pt_BR">
+  <meta property="og:url" content="https://privacy-joice.vercel.app/">
+  <meta property="og:title" content="Joice — conteúdo exclusivo 18+">
+  <meta property="og:description" content="Conteúdo exclusivo da Joice. Assinatura a partir de R$ 9,90, com acesso liberado logo após a confirmação do PIX.">
+  <meta property="og:image" content="https://privacy-joice.vercel.app/og.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Joice — conteúdo exclusivo 18+">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Joice — conteúdo exclusivo 18+">
+  <meta name="twitter:description" content="Conteúdo exclusivo da Joice. Assinatura a partir de R$ 9,90, com acesso liberado logo após a confirmação do PIX.">
+  <meta name="twitter:image" content="https://privacy-joice.vercel.app/og.jpg">
   <meta name="description" content="Um pouco da minha rotina, um lado só nosso. Conheça o clube da Joice e escolha sua assinatura a partir de R$ 9,90." />
   
   
@@ -55,8 +69,8 @@
    pelo sessionStorage, então clicar duas vezes não muda nada. */
 (function(){var g=document.getElementById('ageGate'),ok=document.getElementById('ageConfirm');
 function entrar(){window.__ageOk=true;document.documentElement.dataset.age='ok';g.hidden=true;document.body.classList.remove('age-pending');}
-try{if(sessionStorage.getItem('joice.age.confirmed')==='yes')entrar();}catch(e){}
-ok.addEventListener('click',function(){try{sessionStorage.setItem('joice.age.confirmed','yes');}catch(e){}entrar();});
+try{if(localStorage.getItem('age_gate_confirmed_v1')==='1'||sessionStorage.getItem('joice.age.confirmed')==='yes')entrar();}catch(e){}
+ok.addEventListener('click',function(){try{localStorage.setItem('age_gate_confirmed_v1','1');sessionStorage.setItem('joice.age.confirmed','yes');}catch(e){}entrar();});
 document.getElementById('ageExit').addEventListener('click',function(){window.location.replace('about:blank');});})();
 </script>
 
