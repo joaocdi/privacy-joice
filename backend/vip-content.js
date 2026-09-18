@@ -27,6 +27,8 @@ const profile = {
   name: 'Joice',
   username: '@_johhh.of',
   verified: true,
+  // Localização exibida no perfil (com o pino, abaixo da bio).
+  location: 'Santa Catarina - BRA',
   avatar: '/avatar.jpg',
   cover: '/cover.jpg',
   // Para acrescentar detalhes (altura, número do pé), escreva direto na frase.
