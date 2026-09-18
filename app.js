@@ -79,6 +79,7 @@ function compactNumber(value) {
 }
 
 function applyProfile(profile) {
+  perfilAtual = profile;
   document.body.classList.remove('carregando');
   try { localStorage.setItem('joice.profile.cache', JSON.stringify(profile)); } catch (_) {}
   const text = (id, value) => { const el = document.getElementById(id); if (el && value != null) el.textContent = value; };
@@ -756,6 +757,15 @@ document.addEventListener('click', event => {
       if (!item || typeof item.preview !== 'string' || !item.preview.startsWith('data:image/jpeg;base64,')) return;
       if (item.id) { if (vistos.has(item.id)) return; vistos.add(item.id); }
       const header = blueprint.cloneNode(true);
+      // O modelo vem vazio: cada cartão recebe foto, nome e @ do perfil.
+      if (perfilAtual) {
+        header.querySelectorAll('[data-profile-avatar]').forEach(img => {
+          img.src = perfilAtual.avatar; img.alt = perfilAtual.name;
+          if (window.AylaFrame || window.JoiceFrame) (window.AylaFrame || window.JoiceFrame).apply(img, perfilAtual.avatarCrop, { role: 'avatar' });
+        });
+        header.querySelectorAll('.dynamic-post-name').forEach(el => { el.textContent = perfilAtual.name; });
+        header.querySelectorAll('.dynamic-post-username').forEach(el => { el.textContent = perfilAtual.username; });
+      }
       header.querySelector('.post-type')?.remove();
       const locked = document.createElement('div');
       locked.className = 'locked-post';
