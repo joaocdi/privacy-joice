@@ -578,7 +578,8 @@
       field(numeros, 'Curtidas exibidas', likes, 'Número inteiro. Vazio conta como 0.');
 
       const published = checkbox(visibilidade, 'Publicado', post ? post.published : true);
-      const preview = checkbox(visibilidade, 'Mostrar como prévia na HOME', post?.show_as_preview);
+      // Publicação NOVA já nasce aparecendo na HOME; edição mantém o que estava.
+      const preview = checkbox(visibilidade, 'Mostrar como prévia na HOME', post ? post.show_as_preview : true);
       // Vídeo na HOME: mostra aqui o MESMO teaser derivado que o visitante vê,
       // para a criadora conferir o trecho antes de deixar no ar.
       teaserPreview(visibilidade, post);
