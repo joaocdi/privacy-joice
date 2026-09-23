@@ -1,7 +1,7 @@
 // Additive and shared across database drivers. Existing media bytes remain untouched.
 // preview_video guarda o CAMINHO da derivada de vídeo (joice/previews/...),
 // nunca o caminho do original. São dois arquivos independentes no Storage.
-const columns = { vip_posts: { crop_data: 'TEXT', preview_video: 'TEXT' }, creator_profiles: { avatar_crop: 'TEXT', cover_crop: 'TEXT' } };
+const columns = { vip_posts: { crop_data: 'TEXT', preview_video: 'TEXT', public_media: 'INTEGER NOT NULL DEFAULT 0' }, creator_profiles: { avatar_crop: 'TEXT', cover_crop: 'TEXT' } };
 async function migrate(db, postgres = false) {
   for (const [table, fields] of Object.entries(columns)) {
     const existing = postgres ? null : new Set((await db.all(`PRAGMA table_info(${table})`)).map(c => c.name));
