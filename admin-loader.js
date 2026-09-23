@@ -10,7 +10,7 @@
   window.JoiceAdminSession.then(async me => {
     if (!me?.admin) return;
     await new Promise((resolve, reject) => { const tools = document.createElement('script'); tools.src = base + '/image-tools.js'; tools.onload = resolve; tools.onerror = reject; document.head.append(tools); });
-    const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = base + '/admin-mode.css?v=carousel-1';
+    const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = base + '/admin-mode.css?v=media-editor-2';
     const script = document.createElement('script'); script.src = base + '/admin-mode.js?v=lazy-admin-1';
     document.head.append(css); document.head.append(script);
   }).catch(() => {});

@@ -438,8 +438,9 @@
       if (!files.length) return;
       if (pickTarget) { swapFile(pickTarget, files[0]); pickTarget = null; return; }
       for (const file of files) {
-        if (rows.length >= MAX_MEDIA) { context.say(`No máximo ${MAX_MEDIA} mídias por publicação.`); break; }
-        addRow({ file });
+        if (rows.length >= MAX_MEDIA && !rows.some(row => !row.id && !row.file)) { context.say(`No máximo ${MAX_MEDIA} mídias por publicação.`); break; }
+        const empty = rows.find(row => !row.id && !row.file);
+        if (empty) swapFile(empty, file); else addRow({ file });
       }
       redraw();
     });
@@ -579,7 +580,10 @@
 
       const published = checkbox(visibilidade, 'Publicado', post ? post.published : true);
       // Publicação NOVA já nasce aparecendo na HOME; edição mantém o que estava.
-      const preview = checkbox(visibilidade, 'Mostrar como prévia na HOME', post ? post.show_as_preview : true);
+      const preview = checkbox(visibilidade, 'Mostrar no feed público', post ? post.show_as_preview : true);
+      const publicMedia = checkbox(visibilidade, 'Público, sem blur', Boolean(post?.public_media));
+      field(visibilidade, 'Quem pode ver?', el('small', null, 'Sem blur: qualquer visitante verá todas as fotos e vídeos desta publicação, sem assinatura. Desmarcado: a HOME mostra apenas a prévia desfocada.'));
+      publicMedia.addEventListener('change', () => { if (publicMedia.checked) preview.checked = true; });
       // Vídeo na HOME: mostra aqui o MESMO teaser derivado que o visitante vê,
       // para a criadora conferir o trecho antes de deixar no ar.
       teaserPreview(visibilidade, post);
@@ -601,15 +605,16 @@
         excluir.type = 'button';
         context.actions.prepend(excluir);
       }
-      context.state = { caption, order, published, preview, likes, medias };
+      context.state = { caption, order, published, preview, publicMedia, likes, medias };
     }, async context => {
-      const { caption, order, published, preview, likes, medias } = context.state;
-      const items = await medias.collect(context.say, preview.checked);
+      const { caption, order, published, preview, publicMedia, likes, medias } = context.state;
+      const items = await medias.collect(context.say, preview.checked && !publicMedia.checked);
       const body = {
         caption: caption.value,
         sort_order: Number(order.value),
         published: published.checked,
         show_as_preview: preview.checked,
+        public_media: publicMedia.checked,
         likes_count: likesValue(likes.value),
         // O enquadramento do post acompanha o do primeiro item: é ele que
         // continua preenchendo as colunas antigas nesta fase.
@@ -619,13 +624,13 @@
       };
       // Só mudou o enquadramento de uma mídia que já existia? A amostra da
       // HOME é refeita a partir do arquivo atual, sem reenviar nada.
-      if (post && preview.checked && !medias.hasNewFile()) {
+      if (post && preview.checked && !publicMedia.checked && !medias.hasNewFile()) {
         const first = items[0];
         const alvo = first.id ? '/api/admin/posts/' + post.id + '/media/' + encodeURIComponent(first.id)
           : '/api/admin/posts/' + post.id + '/media';
         const response = await fetch(BASE + alvo);
         if (response.ok) {
-          try { body.preview_image = await derive(await response.blob(), first.crop); }
+          try { first.preview_image = await derive(await response.blob(), first.crop); body.preview_image = first.preview_image; }
           catch (_) { context.say('Não consegui atualizar a amostra da HOME.'); }
         }
       }
@@ -849,7 +854,7 @@
    * como rede de segurança para cartão antigo que ainda não tem id.
    */
   function decorateFeed() {
-    document.querySelectorAll('.am-menu').forEach(m => m.remove());
+    document.querySelectorAll('.am-menu, .vip-post-head > .am-chips, .post-header > .am-chips').forEach(m => m.remove());
     const cards = isVip
       ? [...document.querySelectorAll('.vip-post')]
       : [...document.querySelectorAll('.preview-post')];
@@ -861,7 +866,8 @@
     let position = 0;
     cards.forEach(card => {
       const marked = card.dataset.postId ? byId.get(String(card.dataset.postId)) : null;
-      const post = marked || source[position++];
+      const post = card.dataset.postId ? marked : source[position];
+      position++;
       if (!post) return;
       const head = card.querySelector(isVip ? '.vip-post-head' : '.post-header');
       // A criadora vê o estado sem abrir o menu: RASCUNHO, PUBLICADO, PÚBLICO/SÓ VIP.
@@ -946,7 +952,14 @@
     profileHandles();
     try { await reload(false); } catch (error) { toast(error.message); }
     // O feed do /vip e as prévias da HOME são montados por JS; reencaixa depois.
-    setTimeout(decorateFeed, 1200);
+    let decoratePending = false;
+    new MutationObserver(records => {
+      const changed = records.some(record => [...record.addedNodes].some(node => node.nodeType === 1 && (node.matches('.vip-post,.preview-post') || node.querySelector('.vip-post,.preview-post'))));
+      if (!changed || decoratePending) return;
+      decoratePending = true;
+      requestAnimationFrame(() => { decoratePending = false; decorateFeed(); });
+    }).observe(document.body, {childList:true, subtree:true});
+    decorateFeed();
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
