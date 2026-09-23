@@ -778,3 +778,13 @@ body { background: #ecebe9; }
 .vip-footer .footer-links a { font:400 10.5px Poppins,Arial,sans-serif; color:#8b8b8b; text-decoration:none; }
 .vip-footer .footer-links span { font-size:10px; color:#d4d4d4; }
 .vip-footer .footer-copy { margin:0; font:400 10.5px Poppins,Arial,sans-serif; color:#a09a95; }
+
+/* Consistent member feed and readable captions at every screen width. */
+.vip-post{overflow:hidden;border:1px solid #e9e9ec;border-radius:16px;box-shadow:0 2px 8px #18223006}
+.vip-post-head{display:flex;align-items:center;gap:10px;padding:14px 16px;min-width:0}
+.vip-post-head>div{min-width:0}.vip-post-head small{overflow-wrap:anywhere}
+.vip-caption{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.55;padding:14px 16px}
+.vip-media{width:100%;aspect-ratio:4/5;min-height:0;background:#f3f3f5}
+.vip-media .car-track,.vip-media .car-cell{height:100%;min-height:0}
+.vip-feed.is-grid .vip-media{aspect-ratio:1/1}
+@media(max-width:480px){.vip-post-head{padding:12px}.vip-caption{padding:12px}}

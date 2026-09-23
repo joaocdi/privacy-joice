@@ -1,5 +1,5 @@
 (function(root) {
-  const defaults = role => ({x:50,y:50,zoom:1,ratio:role==='avatar'?'1:1':role==='cover'?'2.44:1':'original'});
+  const defaults = role => ({x:50,y:50,zoom:1,ratio:role==='avatar'?'1:1':role==='cover'?'2.44:1':'4:5'});
   const ratio = (crop,w,h) => crop.ratio==='original' ? (w && h ? w/h : 4/5) : crop.ratio==='4:5' ? 4/5 : crop.ratio==='2.44:1' ? 2.44 : 1;
   function geometry(crop,w,h,cw,ch) {
     const scale=Math.max(cw/w,ch/h)*crop.zoom;
@@ -22,7 +22,15 @@
     const draw=()=>{
       const c=media._cropValue,w=media.naturalWidth||media.videoWidth||4,h=media.naturalHeight||media.videoHeight||5;
       box.style.aspectRatio=String(options.preview ? 4/5 : ratio(c,w,h));
-      if(options.role!=='avatar') {box.style.height='auto';box.style.minHeight='0';}
+      if (box.classList.contains('car-cell') && box.parentElement?.firstElementChild === box && !options.preview) {
+        const container = box.parentElement.parentElement;
+        if (container && !container.closest('.is-grid')) {
+          container.style.aspectRatio = String(ratio(c,w,h));
+          container.style.height = 'auto';
+          container.style.minHeight = '0';
+        }
+      }
+      if(options.role!=='avatar') {box.style.height=box.classList.contains('car-cell')?'100%':'auto';box.style.minHeight='0';}
       const g=geometry(c,w,h,box.clientWidth,box.clientHeight);
       for(const [k,v]of Object.entries(g))media.style.setProperty(k,v+'px','important');
       media.style.setProperty('position','absolute','important');
@@ -66,6 +74,7 @@
         vazio.textContent='Escolha um arquivo para enquadrar.';viewport.append(vazio);return;}
       element=document.createElement(nextType==='video'?'video':'img');
       element.alt=label;element.draggable=false;if(nextType==='video'){element.muted=true;element.playsInline=true;element.preload='metadata';}
+      element.addEventListener('error', () => { heading.textContent = label + ' — não foi possível carregar. Você pode trocar o arquivo e salvar.'; });
       element.src=next;viewport.append(element);draw();}
     setSource(src,type);
     return {get:()=>({...value}),setFile(file){if(url)URL.revokeObjectURL(url);url=URL.createObjectURL(file);setSource(url,file.type.startsWith('video/')?'video':'image');},destroy(){element?._cropObserver?.disconnect();if(url)URL.revokeObjectURL(url);}};

@@ -2056,3 +2056,10 @@ body.carregando .stats-row span { color:#dcd8d5; }
 /* A aba "Mídias" é amostra de 6: mesmo com o feed paginado, a grade
    nunca passa disso. */
 .media-grid article.preview-post:nth-of-type(n+7) { display: none; }
+
+/* Feed: public posts share the same card dimensions as subscriber previews. */
+.locked-post.public-post{filter:none;cursor:default;aspect-ratio:4/5;height:auto;min-height:0;background:#f3f3f5}
+.public-post .car-cell img,.public-post .car-cell video{filter:none!important;opacity:1!important}
+.preview-post{overflow:hidden;border:1px solid #e9e9ec;border-radius:16px;box-shadow:0 2px 8px #18223006}
+.preview-caption{line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere}
+.preview-engagement{align-items:center;gap:12px}

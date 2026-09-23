@@ -88,8 +88,25 @@ async function main() {
   assert.equal(previews[0].preview, 'data:image/jpeg;base64,' + derivative);
   assert.ok(!JSON.stringify(previews).includes('joice/test.png'));
   await assert.rejects(posts.save(post.id, { caption: 'x', sort_order: 0, published: true, show_as_preview: true, preview_image: 'nao-e-jpeg', version: post.version }));
+  // Explicit public opt-in is required; changing it back revokes the public route.
+  assert.equal(await posts.publicMediaItem(post.id), null);
+  post = await posts.save(post.id, {caption:'Public',sort_order:0,published:true,show_as_preview:true,public_media:true,version:post.version}, 'session');
+  assert.ok(await posts.publicMediaItem(post.id));
+  assert.equal((await posts.homePreviews())[0].publicMedia, true);
+  const currentMedia = (await posts.list()).find(p => p.id === post.id).media;
+  assert.ok(await posts.publicMediaItem(post.id, currentMedia[0].id));
+  assert.equal(await posts.publicMediaItem(post.id, 'another-post-item'), null);
+  post = await posts.save(post.id, {caption:'Private',sort_order:0,published:true,show_as_preview:true,public_media:false,version:post.version}, 'session');
+  assert.equal(await posts.publicMediaItem(post.id), null);
+  // Pre-carousel records can be edited without an existing media row.
+  await db.run('DELETE FROM vip_post_media WHERE post_id=?', post.id);
+  post = await posts.save(post.id, {caption:'Legacy edited',sort_order:0,published:true,show_as_preview:true,version:post.version,items:[{id:'item-'+post.id,crop:{x:50,y:50,zoom:1,ratio:'4:5'}}]}, 'session');
+  assert.equal((await posts.list()).find(p => p.id === post.id).media.length, 1);
+  post = await posts.save(post.id, {caption:'Draft public',sort_order:0,published:false,show_as_preview:true,public_media:true,version:post.version}, 'session');
+  assert.equal(await posts.publicMediaItem(post.id), null);
   await posts.archive(post.id, true, post.version);
   assert.equal((await posts.homePreviews()).length, 0);
+  assert.equal(await posts.publicMediaItem(post.id), null);
   // Banco criado antes deste recurso: as colunas voltam sem perder as linhas.
   await engine.exec('ALTER TABLE vip_posts DROP COLUMN show_as_preview, DROP COLUMN preview_image');
   const survivors = (await engine.query('SELECT COUNT(*) AS n FROM vip_posts')).rows[0].n;

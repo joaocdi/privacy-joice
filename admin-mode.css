@@ -311,3 +311,12 @@ body.am-on { padding-top: var(--am-bar-height, 56px); }
 }
 .am-sheet-actions .am-btn-quiet{background:#0000000a;border:1px solid #00000022;color:#4a4a4a;}
 .am-sheet-actions .am-btn-quiet:hover{background:#00000014;}
+
+/* Media editing stays usable on narrow screens and with large original files. */
+.am-media-item{min-width:0;padding:14px;border:1px solid #e7e7ec;border-radius:14px;background:#fafafb}
+.am-media-list{display:grid;gap:16px}.am-media-tools{display:flex;gap:8px;flex-wrap:wrap}
+.am-media-head{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.am-media-head strong{overflow-wrap:anywhere}.am-media-tools button{min-height:44px}
+.crop-editor-view{max-width:100%;max-height:60vh}
+.crop-controls{gap:6px}.crop-controls select{flex:1}
+.am-field textarea{line-height:1.5;min-height:112px;resize:vertical}

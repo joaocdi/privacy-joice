@@ -137,6 +137,14 @@ app.use('/api', (req, res, next) => { res.set('Cache-Control', 'no-store'); next
  * minúscula gerada no painel, nunca `media_path`, nunca link assinado.
  * Sem posts marcados, devolve lista vazia e a HOME mantém as prévias estáticas.
  */
+app.get('/api/home/public-media/:postId/:mediaId?', async (req, res, next) => {
+  try {
+    const item = await vipPosts.publicMediaItem(req.params.postId, req.params.mediaId);
+    if (!item || item.mediaDriver !== vipMedia.driverName()) return res.sendStatus(404);
+    res.set('Cache-Control', 'private, no-store');
+    await vipMedia.deliver(req, res, item.source);
+  } catch (error) { next(error); }
+});
 app.get('/api/home/previews', async (req, res) => {
   try {
     // Página do feed: sem parâmetro, continua entregando tudo (compatível).

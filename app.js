@@ -347,7 +347,7 @@ function decorateLockedPost(post, { type, caption, id, likes_count }) {
   const left = document.createElement('span');
   left.textContent = Number.isFinite(likes_count) ? likes_count.toLocaleString('pt-BR') + ' curtidas' : 'Conteúdo exclusivo';
   if (Number.isFinite(likes_count)) left.setAttribute('aria-label', likes_count + ' curtidas');
-  const note = document.createElement('span'); note.textContent = 'Só para assinantes';
+  const note = document.createElement('span'); note.textContent = post.classList.contains('public-post') ? 'Publicação pública' : 'Só para assinantes';
   footer.append(left, note); article.append(footer);
   return article;
 }
@@ -775,7 +775,7 @@ document.addEventListener('click', event => {
     const fragment = document.createDocumentFragment();
     const usados = [];
     previews.forEach((item, index) => {
-      if (!item || typeof item.preview !== 'string' || !item.preview.startsWith('data:image/jpeg;base64,')) return;
+      if (!item || (!item.publicMedia && (typeof item.preview !== 'string' || !item.preview.startsWith('data:image/jpeg;base64,')))) return;
       if (item.id) { if (vistos.has(item.id)) return; vistos.add(item.id); }
       const header = blueprint.cloneNode(true);
       // O modelo vem vazio: cada cartão recebe foto, nome e @ do perfil.
@@ -815,6 +815,19 @@ document.addEventListener('click', event => {
       // derivada simplesmente não vira slide; o original nunca é alternativa.
       const safe = Array.isArray(item.items) ? item.items.filter(isSafePreviewItem) : [];
       if (safe.length > 1) mountLockedCarousel(locked, overlay, safe, item.teaserSeconds);
+      if (item.publicMedia && item.publicUrl?.startsWith('/api/home/public-media/')) {
+        locked.replaceChildren();
+        locked.classList.add('public-post');
+        const publicItems = item.items?.length ? item.items : [{type:item.type, publicUrl:item.publicUrl, crop:item.crop}];
+        JoiceCarousel.build(locked, publicItems.filter(media => media.publicUrl?.startsWith('/api/home/public-media/')).map(media => cell => {
+          const element = document.createElement(media.type === 'video' ? 'video' : 'img');
+          element.src = API_BASE + media.publicUrl;
+          if (media.type === 'video') { element.controls=true; element.playsInline=true; element.preload='metadata'; }
+          else { element.alt=item.caption || 'Publicação pública'; element.loading='lazy'; }
+          cell.append(element);
+          JoiceFrame.apply(element, media.crop, {box:cell});
+        }));
+      }
       fragment.append(header, locked);
       usados.push({ item, locked });
     });
