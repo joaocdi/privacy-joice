@@ -332,7 +332,7 @@ function buildMediaPost(post, profile) {
       image.decoding = 'async';
       image.addEventListener('error', () => mediaUnavailable(cell, { draft: post.draft }));
       image.src = API_BASE + item.media;
-      image.alt = post.caption || 'Foto exclusiva da Joice';
+      image.alt = post.caption || 'Foto exclusiva da Nina';
       image.loading = index === 0 ? 'eager' : 'lazy';
       cell.append(image);
       JoiceFrame.apply(image, item.crop, { box: cell });
@@ -460,7 +460,7 @@ function icon(pathData) {
 
 function verifiedBadge() {
   const image = document.createElement('img');
-  image.src = '/verified-joice.png';
+  image.src = '/verified-nina.png';
   image.width = 14;
   image.height = 14;
   image.className = 'verified-icon';

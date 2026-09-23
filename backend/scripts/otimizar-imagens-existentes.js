@@ -57,8 +57,8 @@ async function main() {
     fs.copyFileSync(path.join(root,'previews',name), path.join(job,name+'.original'));
     entries.push({kind:'preview',input:name+'.original',output:name,staticPath:'previews/'+name});
   }
-  fs.copyFileSync(path.join(root,'verified-joice.png'),path.join(job,'badge.original'));
-  entries.push({kind:'badge',input:'badge.original',output:'badge.png',staticPath:'verified-joice.png'});
+  fs.copyFileSync(path.join(root,'verified-nina.png'),path.join(job,'badge.original'));
+  entries.push({kind:'badge',input:'badge.original',output:'badge.png',staticPath:'verified-nina.png'});
   fs.writeFileSync(path.join(job,'backup.json'),JSON.stringify({profile,tables}));
   fs.writeFileSync(path.join(job,'input.json'),JSON.stringify(entries));
   execFileSync('python',['-c',python,job],{stdio:'pipe'});

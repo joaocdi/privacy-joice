@@ -24,23 +24,22 @@
 
 // Default profile until /admin → Perfil is saved. Shared by HOME and VIP.
 const profile = {
-  name: 'Joice',
-  username: '@_johhh.of',
+  name: 'Nina',
+  username: '@nina',
   verified: true,
   // Localização exibida no perfil (com o pino, abaixo da bio).
-  location: 'Santa Catarina - BRA',
-  avatar: '/avatar.jpg',
-  cover: '/cover.jpg',
+  location: '',
+  avatar: '/nina-avatar.svg',
+  cover: '/nina-cover.svg',
   // Para acrescentar detalhes (altura, número do pé), escreva direto na frase.
-  bio: 'Oii sou a joice >< 20 anos.. Aqui gosto de mostrar meu outro lado... '
-    + '(Sexting, pack, avaliação, personalizado etc..) To online todos os dias... :3 vem ?',
+  bio: 'Oi, eu sou a Nina ♡ Entra, fica à vontade e descobre meu lado mais reservado por aqui.',
   /**
    * Números mostrados no perfil e nas abas.
    *   mídias  = photos + videos (calculado, não precisa escrever)
    *   posts   = o contador da aba "Postagens"
    * São os números que você declara; edite à vontade.
    */
-  stats: { posts: 139, photos: 67, videos: 124, likes: '12,8 mil' }
+  stats: { posts: 0, photos: 0, videos: 0, likes: 0 }
 };
 
 /** Tipos aceitos: 'image' | 'video' | 'cta' (bloco de chamada, sem mídia). */

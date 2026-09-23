@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 764 1024" role="img" aria-label="Capa da Nina">
+  <defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#fff0e8"/><stop offset=".55" stop-color="#f9c8bd"/><stop offset="1" stop-color="#e7a6a2"/></linearGradient></defs>
+  <rect width="764" height="1024" fill="url(#bg)"/>
+  <circle cx="550" cy="230" r="290" fill="#fff" opacity=".2"/>
+  <circle cx="105" cy="850" r="290" fill="#fff" opacity=".15"/>
+  <text x="382" y="590" font-family="Georgia,serif" font-size="100" fill="#803f43" text-anchor="middle">Nina</text>
+</svg>

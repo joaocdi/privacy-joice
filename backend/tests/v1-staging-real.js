@@ -29,7 +29,7 @@ async function req(route,{body,cookie='',csrf='',token='',method=body?'POST':'GE
  execFileSync(ffmpeg,['-y','-f','lavfi','-i','color=c=orange:s=160x240:d=1','-an','-c:v','libx264','-pix_fmt','yuv420p',video],{stdio:'ignore'});
  execFileSync(ffmpeg,['-y','-f','lavfi','-i','color=c=orange:s=32x48','-frames:v','1',thumb],{stdio:'ignore'});
  async function upload(bytes,mime){const start=await req('/api/admin/uploads',{cookie,csrf,body:{size:bytes.length,mime}});assert.equal(start.status,201);uploads.push(start.data.id);const done=await req('/api/admin/uploads/'+start.data.id,{cookie,csrf,method:'PATCH',body:bytes});assert.equal(done.status,200);assert.equal(done.data.complete,true);return start.data.id;}
- const photo=await upload(fs.readFileSync(path.join(__dirname,'../../verified-joice.png')),'image/png');
+ const photo=await upload(fs.readFileSync(path.join(__dirname,'../../verified-nina.png')),'image/png');
  const film=await upload(fs.readFileSync(video),'video/mp4');
  const preview='data:image/jpeg;base64,'+fs.readFileSync(thumb).toString('base64');
  const input={caption:'V1 integration test',published:true,show_as_preview:true,sort_order:9000,likes_count:0,items:[{uploadId:photo,preview_image:preview},{uploadId:film,preview_image:preview}]};

@@ -324,6 +324,7 @@ body {
 .btn-plan:hover { opacity: 0.93; transform: translateY(-1px); }
 .btn-plan:active { transform: scale(0.98); }
 .plan-price { font-weight: 700; font-size: 13.5px; color: #1a0c02; }
+.offer-assurance { margin: 11px 10px 0; color: #736866; font: 400 11.5px/1.5 Poppins,Arial,sans-serif; text-align: center; }
 
 /* ===========================
    CONTENT TABS

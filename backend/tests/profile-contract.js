@@ -2,9 +2,15 @@ const assert = require('node:assert/strict');
 module.exports = async function testProfile(db) {
   const profile = require('../services/profile');
   const initial = await profile.get();
-  assert.equal(initial.name, 'Joice');
+  assert.equal(initial.name, 'Nina');
+  assert.equal(initial.stats.likes, 0);
   assert.equal(initial.bio, require('../vip-content').profile.bio);
-  const body = { ...initial, name: 'Joice QA', bio: '<script>texto como texto</script>' };
+  await db.run("INSERT INTO creator_profiles(id,name,username,bio) VALUES ('joice','Joice','@joice.of','Oi Joice')");
+  const renamed = await profile.get();
+  assert.equal(renamed.name, 'Nina');
+  assert.equal(renamed.username, '@nina');
+  assert.equal(renamed.bio, 'Oi Nina');
+  const body = { ...renamed, name: 'Nina QA', bio: '<script>texto como texto</script>' };
   const saved = await profile.save(body, 'profile-session');
   assert.equal(saved.version, 1);
   assert.equal((await profile.get()).bio, body.bio);

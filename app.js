@@ -44,9 +44,6 @@ const plans = [
   { id: "semester",    label: "6 meses",       price: "R$ 29,90" }
 ];
 
-// Viewer count – to be replaced by backend value
-const viewerCount = 70;
-
 // Offer expiry – feed a real timestamp from backend later
 const offerExpiresAt = null; // e.g. new Date(Date.now() + 57000)
 
@@ -62,7 +59,6 @@ const offerExpiresAt = null; // e.g. new Date(Date.now() + 57000)
  */
 function compactNumber(value) {
   const texto = String(value ?? '').trim();
-  // Valor já escrito à mão ("12,8 mil"): respeita como está.
   if (/[a-zA-Z]/.test(texto)) return texto;
   const number = Number(texto.replace(/[^0-9.-]/g, ''));
   if (!Number.isFinite(number)) return String(value ?? '');
@@ -81,7 +77,7 @@ function compactNumber(value) {
 function applyProfile(profile) {
   perfilAtual = profile;
   document.body.classList.remove('carregando');
-  try { localStorage.setItem('joice.profile.cache', JSON.stringify(profile)); } catch (_) {}
+  try { localStorage.setItem('nina.profile.cache', JSON.stringify(profile)); } catch (_) {}
   const text = (id, value) => { const el = document.getElementById(id); if (el && value != null) el.textContent = value; };
   text('profileName', profile.name);
   document.querySelectorAll('[data-profile-avatar]').forEach(el => { el.src = profile.avatar; el.alt = profile.name; JoiceFrame.apply(el,profile.avatarCrop,{role:"avatar"}); });
@@ -100,7 +96,7 @@ function applyProfile(profile) {
     text('statVideos', compactNumber(stats.videos));
     text('statLikes', compactNumber(stats.likes));
     text('statLocked', compactNumber(stats.posts));
-    // Contagens de apresentação solicitadas; não alteram registros de conteúdo.
+    // Os números vêm das publicações e das curtidas registradas no servidor.
     text('tabPostsLabel', `${stats.posts} Postagens`);
     text('tabMediaLabel', `${Number(stats.photos) + Number(stats.videos)} Mídias`);
   }
@@ -112,8 +108,6 @@ function applyProfile(profile) {
     location.hidden = !value;
   }
 
-  const viewers = document.getElementById('viewerCountEl');
-  if (viewers) viewers.textContent = viewerCount + ' assistindo agora';
 }
 
 
@@ -722,7 +716,7 @@ document.addEventListener('click', event => {
   // Pinta na hora com o perfil da última visita (some o esqueleto no F5);
   // a resposta da API entra por cima em seguida.
   try {
-    const salvo = JSON.parse(localStorage.getItem('joice.profile.cache') || 'null');
+    const salvo = JSON.parse(localStorage.getItem('nina.profile.cache') || 'null');
     if (salvo && typeof salvo.name === 'string') applyProfile(salvo);
   } catch (_) {}
   try {

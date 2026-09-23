@@ -121,7 +121,7 @@ async function main() {
   check((await request('/api/admin/profile', { method: 'PUT', body: initialProfile, headers: { 'x-csrf-token': 'wrong' } })).status === 403, 'profile requires CSRF');
   check((await request('/api/admin/profile', { method: 'PUT', body: { ...initialProfile, bio: 'Bio pelo painel' } })).status === 200, 'profile saves through authenticated endpoint');
   check((await request('/api/profile', { authenticated: false })).data.bio === 'Bio pelo painel', 'public profile reflects admin edits');
-  check((await request('/api/profile/media/avatar', { authenticated: false })).headers.get('location') === '/avatar.jpg', 'default avatar route');
+  check((await request('/api/profile/media/avatar', { authenticated: false })).headers.get('location') === '/nina-avatar.svg', 'default avatar route');
   await (await getDb()).run('DELETE FROM creator_profiles');
   await require('./profile-contract')(await getDb());
   const png = Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]), Buffer.alloc(100)]);
