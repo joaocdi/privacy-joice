@@ -18,12 +18,12 @@ function install(app) {
     try { const url = new URL(process.env.SUPABASE_URL); if (url.protocol === 'https:') imageOrigin = ' ' + url.origin; } catch (_) { /* Storage not configured */ }
     res.set({ 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer',
       // data: in img-src only: the HOME preview derivative is rendered from a data URI.
-      'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:" + imageOrigin + "; media-src 'self' blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'" });
+      'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:" + imageOrigin + "; media-src 'self' blob:" + imageOrigin + "; connect-src 'self'" + imageOrigin + "; frame-ancestors 'none'; base-uri 'none'; form-action 'self'" });
     next();
   }
   pages.use(headers);
   api.use(headers);
-  api.use(express.json({ limit: '100kb' }));
+  api.use(express.json({ limit: '512kb' }));
   pages.get('/login', (req, res) => res.sendFile(path.join(directory, 'login.html')));
   pages.get('/login.js', (req, res) => res.sendFile(path.join(directory, 'login.js')));
   pages.get('/style.css', (req, res) => res.sendFile(path.join(directory, 'style.css')));
