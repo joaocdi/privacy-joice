@@ -22,7 +22,7 @@ async function setSource(value) {
 // The panel list never carries preview_image itself: it only needs to know
 // whether the derivative exists, and the payload stays small with many posts.
 const LIST_COLUMNS = `id,creator_id,type,media_path,media_driver,caption,sort_order,published,archived,
-  show_as_preview,likes_count,crop_data,version,created_at,updated_at,
+  show_as_preview,public_media,likes_count,crop_data,version,created_at,updated_at,
   CASE WHEN preview_image IS NULL OR preview_image='' THEN 0 ELSE 1 END AS has_preview`;
 async function list() {
   const db = await getDb();
@@ -50,13 +50,13 @@ async function homePreviews({ limit = MAX_HOME_PREVIEWS, offset = 0 } = {}) {
   // A página vem do banco já cortada: ler TODAS as prévias (cada uma com a
   // amostra embutida) só para jogar fora quase tudo custava mais de um
   // segundo por visita.
-  const filtro = "creator_id='joice' AND published=1 AND archived=0 AND show_as_preview=1 AND preview_image IS NOT NULL AND preview_image<>''";
+  const filtro = "creator_id='joice' AND published=1 AND archived=0 AND show_as_preview=1 AND (public_media=1 OR (preview_image IS NOT NULL AND preview_image<>''))";
   const start = Math.max(0, Math.min(Number(offset) || 0, MAX_HOME_PREVIEWS));
   const size = Math.max(1, Math.min(Number(limit) || MAX_HOME_PREVIEWS, MAX_HOME_PREVIEWS));
   const janela = Math.max(0, Math.min(size, MAX_HOME_PREVIEWS - start));
   const contagem = await db.get(`SELECT COUNT(*) AS n FROM vip_posts WHERE ${filtro}`);
   const total = Math.min(Number(contagem?.n) || 0, MAX_HOME_PREVIEWS);
-  const chosen = janela ? await db.all(`SELECT id,type,caption,preview_image,crop_data,preview_video,likes_count,
+  const chosen = janela ? await db.all(`SELECT id,type,caption,public_media,preview_image,crop_data,preview_video,likes_count,
     (SELECT COUNT(*) FROM vip_post_likes l WHERE l.post_id=vip_posts.id) AS likes FROM vip_posts
     WHERE ${filtro}
     ORDER BY sort_order,created_at,id LIMIT ? OFFSET ?`, janela, start) : [];
@@ -68,9 +68,11 @@ async function homePreviews({ limit = MAX_HOME_PREVIEWS, offset = 0 } = {}) {
     // minúscula embutida; o vídeo entrega a rota do teaser dele. Em nenhum
     // caso sai caminho de arquivo original ou link assinado.
     const items = (byPost.get(row.id) || [])
-      .filter(item => item.preview_image || previewVideo.isPreviewPath(item.preview_video))
+      .filter(item => row.public_media || item.preview_image || previewVideo.isPreviewPath(item.preview_video))
       .map(item => ({
         id: item.id,
+        publicMedia: Boolean(row.public_media),
+        publicUrl: row.public_media ? `/api/home/public-media/${encodeURIComponent(row.id)}/${encodeURIComponent(item.id)}` : null,
         type: item.type,
         crop: crop.read(item.crop_data),
         preview: previewImage.dataUri(item.preview_image),
@@ -78,6 +80,8 @@ async function homePreviews({ limit = MAX_HOME_PREVIEWS, offset = 0 } = {}) {
           ? `/api/home/preview-video/${encodeURIComponent(row.id)}/${encodeURIComponent(item.id)}` : null
       }));
     return {
+      publicMedia: Boolean(row.public_media),
+      publicUrl: row.public_media ? `/api/home/public-media/${encodeURIComponent(row.id)}` : null,
       id: row.id, likes_count: Number(row.likes_count || 0) + Number(row.likes || 0), type: row.type, caption: row.caption || '', crop: crop.read(row.crop_data),
       preview: previewImage.dataUri(row.preview_image),
       // O caminho do teaser NÃO sai daqui: sai só a rota que o entrega, e ela
@@ -208,6 +212,7 @@ async function findPublished(id) {
   return p ? asFeed(p) : null;
 }
 function validate(input) {
+  if (input.public_media !== undefined && typeof input.public_media !== 'boolean') throw fail('Informe se a mídia é pública.');
   if (typeof input.caption !== 'string' || input.caption.length > 4000) throw fail('Legenda deve ter até 4.000 caracteres.');
   if (!Number.isInteger(input.sort_order) || Math.abs(input.sort_order) > 1000000) throw fail('Ordem inválida.');
   if (typeof input.published !== 'boolean') throw fail('Informe publicado ou rascunho.');
@@ -311,7 +316,7 @@ async function save(id, input, sessionId) {
     const showAsPreview = Boolean(input.show_as_preview);
     // Campo ausente mantém o valor atual; vazio vira zero.
     const likesCount = input.likes_count === undefined ? (old ? Number(old.likes_count || 0) : 0) : input.likes_count;
-    if (showAsPreview && !preview) throw fail('Para mostrar na HOME, selecione a mídia novamente para gerar a prévia.');
+    if (showAsPreview && !(input.public_media ?? old?.public_media) && !preview) throw fail('Para mostrar na HOME, selecione a mídia novamente para gerar a prévia.');
     if (old) {
       const result = await db.run(`UPDATE vip_posts SET type=?,media_path=?,media_driver=?,caption=?,sort_order=?,published=?,show_as_preview=?,preview_image=?,preview_video=?,likes_count=?,version=version+1,updated_at=CURRENT_TIMESTAMP WHERE id=? AND version=?`,
         asset.type, asset.media_path, asset.media_driver, input.caption, input.sort_order, Number(input.published), Number(showAsPreview), preview, teaser, likesCount, id, input.version);
@@ -327,6 +332,7 @@ async function save(id, input, sessionId) {
       await db.run('UPDATE vip_posts SET crop_data=? WHERE id=?',JSON.stringify(framing),id);
     }
 
+    if (input.public_media !== undefined) await db.run('UPDATE vip_posts SET public_media=? WHERE id=?', Number(input.public_media), id);
     /* ------------------------------------------------------------ carrossel */
     const row = await db.get('SELECT * FROM vip_posts WHERE id=?', id);
     if (Array.isArray(input.items)) {
@@ -465,4 +471,13 @@ async function deletePermanent(id, version) {
   const items = pendentes.length ? await postMedia.releaseOrphans(transaction, pendentes) : [];
   return { deleted:true, storage, teaser, items };
 }
-module.exports = { deletePermanent, source, setSource, list, feed, adminFeed, homePreviews, homeTeaserPath, findMediaItem, findPublished, findForAdmin, save, archive, migrate, adoptLegacyOnce, like, fail, MAX_HOME_PREVIEWS };
+async function publicMediaItem(postId, mediaId = null) {
+  if (await source() !== 'managed') return null;
+  const db = await getDb();
+  const post = await db.get("SELECT * FROM vip_posts WHERE id=? AND creator_id='joice' AND published=1 AND archived=0 AND show_as_preview=1 AND public_media=1", String(postId));
+  if (!post) return null;
+  const items = await postMedia.listFor(db, post);
+  const item = mediaId ? items.find(item => item.id === String(mediaId)) : items[0];
+  return item ? { source: item.media_path, mediaDriver: item.media_driver } : null;
+}
+module.exports = { publicMediaItem, deletePermanent, source, setSource, list, feed, adminFeed, homePreviews, homeTeaserPath, findMediaItem, findPublished, findForAdmin, save, archive, migrate, adoptLegacyOnce, like, fail, MAX_HOME_PREVIEWS };

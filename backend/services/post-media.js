@@ -158,6 +158,10 @@ async function replaceAll(db, post, items, sessionId) {
     const id = old ? old.id : 'item-' + crypto.randomUUID();
 
     if (old) {
+      // Old single-media posts may still exist only in vip_posts.
+      await db.run(`INSERT INTO vip_post_media(id,post_id,type,media_path,media_driver,sort_order,crop_data,preview_image,preview_video)
+        VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING`,
+        old.id, post.id, old.type, old.media_path, old.media_driver, 0, old.crop_data, old.preview_image, old.preview_video);
       await db.run(`UPDATE vip_post_media SET type=?,media_path=?,media_driver=?,sort_order=?,crop_data=?,preview_image=?,preview_video=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`,
         asset.type, asset.media_path, asset.media_driver, index, framing, preview, teaser, id);
     } else {
