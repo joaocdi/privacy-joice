@@ -3,7 +3,7 @@ module.exports = async function testProfile(db) {
   const profile = require('../services/profile');
   const initial = await profile.get();
   assert.equal(initial.name, 'Nina');
-  assert.equal(initial.stats.likes, 0);
+  assert.equal(initial.stats.likes, '35,4 mil');
   assert.equal(initial.bio, require('../vip-content').profile.bio);
   await db.run("INSERT INTO creator_profiles(id,name,username,bio) VALUES ('joice','Joice','@joice.of','Oi Joice')");
   const renamed = await profile.get();

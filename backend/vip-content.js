@@ -39,7 +39,7 @@ const profile = {
    *   posts   = o contador da aba "Postagens"
    * São os números que você declara; edite à vontade.
    */
-  stats: { posts: 0, photos: 0, videos: 0, likes: 0 }
+  stats: { posts: 139, photos: 150, videos: 40, likes: '35,4 mil' }
 };
 
 /** Tipos aceitos: 'image' | 'video' | 'cta' (bloco de chamada, sem mídia). */

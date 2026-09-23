@@ -7,38 +7,19 @@ const { fail } = require('./vip-posts');
 async function read(db) {
   return (db || await getDb()).get("SELECT * FROM creator_profiles WHERE id='joice'");
 }
-function present(row, stats) {
+function present(row) {
   // Older installations may still contain the original creator's untouched defaults.
   return { name: !row?.name || /joice/i.test(row.name) ? defaults.name : row.name,
     username: !row?.username || /joice|johhh/i.test(row.username) ? defaults.username : row.username,
     bio: !row?.bio || row.bio.startsWith('Oii sou a joice ><') ? defaults.bio : row.bio.replace(/joice/gi, defaults.name),
-    verified: Boolean(defaults.verified), stats,
+    verified: Boolean(defaults.verified), stats: defaults.stats,
     location: defaults.location || '',
     avatarCrop: crop.read(row?.avatar_crop, 'avatar'), coverCrop: crop.read(row?.cover_crop, 'cover'),
     avatar: '/api/profile/media/avatar?v=' + (row?.version || 0),
     cover: '/api/profile/media/cover?v=' + (row?.version || 0), version: row?.version || 0 };
 }
-async function realStats(db) {
-  const active = await db.get("SELECT source FROM vip_content_settings WHERE id='joice'");
-  if (active?.source !== 'managed') {
-    const posts = require('../vip-content').posts.filter(post => !post.draft && post.type !== 'cta');
-    return { posts: posts.length, photos: posts.filter(post => post.type === 'image').length,
-      videos: posts.filter(post => post.type === 'video').length, likes: 0 };
-  }
-  const items = await db.get(`SELECT COUNT(DISTINCT p.id) AS posts,
-    COALESCE(SUM(CASE WHEN COALESCE(m.type,p.type)='image' THEN 1 ELSE 0 END),0) AS photos,
-    COALESCE(SUM(CASE WHEN COALESCE(m.type,p.type)='video' THEN 1 ELSE 0 END),0) AS videos
-    FROM vip_posts p LEFT JOIN vip_post_media m ON m.post_id=p.id
-    WHERE p.creator_id='joice' AND p.published=1 AND p.archived=0`);
-  const likes = await db.get(`SELECT COUNT(*) AS n FROM vip_post_likes l
-    JOIN vip_posts p ON p.id=l.post_id
-    WHERE p.creator_id='joice' AND p.published=1 AND p.archived=0`);
-  return { posts: Number(items?.posts || 0), photos: Number(items?.photos || 0),
-    videos: Number(items?.videos || 0), likes: Number(likes?.n || 0) };
-}
 async function get() {
-  const db = await getDb();
-  return present(await read(db), await realStats(db));
+  return present(await read());
 }
 async function save(body, sessionId) {
   for (const [key, max] of [['name',80], ['username',80], ['bio',4000]]) {
@@ -69,7 +50,7 @@ async function save(body, sessionId) {
       const value = body[role + 'Crop'] === undefined ? crop.read(current[role + '_crop'],role) : crop.normalize(body[role + 'Crop'],role);
       await db.run(`UPDATE creator_profiles SET ${role}_crop=? WHERE id='joice'`,JSON.stringify(value));
     }
-    return present(await read(db), await realStats(db));
+    return present(await read(db));
   });
 }
 async function image(role) {
