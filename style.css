@@ -1516,11 +1516,9 @@ body { background: #e9e9ea; }
 
 /* ------------------------------------------------------ oferta de assinatura */
 .offer-card { padding: 14px; }
-.offer-now { display:inline-flex; align-items:center; gap:6px; margin:0 0 9px; padding:5px 10px; border:1px solid #fbd6bd; border-radius:999px; background:#fff3e9; color:#a3410e; font:600 11px/1.3 Poppins,Arial,sans-serif; }
-.offer-now span { color:#f0792d; font-size:13px; }
 .offer-title {
   display: flex; align-items: center; gap: 7px;
-  margin: 0 0 12px; font: 600 15px/1.4 Poppins, Arial, sans-serif; color: #222;
+  margin: 0 0 12px; font: 600 13.5px Poppins, Arial, sans-serif; color: #222;
 }
 .offer-title svg { color: #f97316; }
 .offer-note { display: flex; align-items: center; gap: 9px; margin-bottom: 16px; }
@@ -1547,8 +1545,6 @@ body { background: #e9e9ea; }
 .offer-original { margin: 8px 0 0; text-align: right; font-size: 11px; color: #8e8e93; }
 .offer-original del { color: #8e8e93; margin-left: 4px; }
 .offer-card .plan-reassurance { margin: 12px 0 0; }
-.pix-expiry { width:max-content; max-width:100%; margin:4px auto 14px; padding:7px 12px; border:1px solid #f2c8a6; border-radius:999px; background:#fff5ec; color:#9b3c0c; text-align:center; font:600 12px/1.4 Poppins,Arial,sans-serif; }
-.pix-expiry.is-urgent { background:#fff0ed; border-color:#f5a99d; color:#a52b1a; }
 
 /* ------------------------------------------------------------- assinaturas */
 .plans-section { padding: 14px; }

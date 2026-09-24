@@ -157,17 +157,16 @@ document.getElementById('ageExit').addEventListener('click',function(){window.lo
        catálogo do backend; nada aqui altera valor. -->
 
   <section class="offer-card" id="offerCard">
-    <p class="offer-now"><span aria-hidden="true">✦</span> Quer entrar hoje?</p>
     <h2 class="offer-title">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.2l1.9 4.9 4.9 1.9-4.9 1.9L12 16.8l-1.9-4.9L5.2 10l4.9-1.9z"/><path d="M18.5 16.2l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"/></svg>
-      O que eu deixei só no VIP tá te esperando lá dentro 🎀
+      Oferta de assinatura
     </h2>
 <div class="offer-cta">
 <button class="btn-plan primary-plan" id="btnPlan1m">
-        <span class="plan-cta-label">QUERO ENTRAR AGORA <span class="plan-price">R$ 9,90</span></span>
+        <span class="plan-cta-label">Assinar agora <span class="plan-price">R$ 9,90</span></span>
       </button>
     </div>
-    <p class="offer-assurance">Confirmou o PIX? O acesso libera em seguida. VIP por 30 dias, sem renovação automática. WhatsApp é separado.</p>
+    <p class="offer-assurance">VIP por 30 dias · pagamento único de R$ 9,90 via PIX · WhatsApp pago à parte · sem renovação automática.</p>
   </section>
 
   <!-- ===== ASSINATURAS =====
@@ -272,7 +271,7 @@ document.getElementById('ageExit').addEventListener('click',function(){window.lo
       <div id="pixActiveArea" style="display:none;">
         <p id="pixMockNotice" class="checkout-note" hidden>Modo de demonstração · este PIX não é pagável.</p>
         <button type="button" id="stagingConfirm" class="btn-orange btn-pix" hidden>SIMULAR PAGAMENTO — STAGING</button>
-        <p class="pix-instruction">Pague com Pix</p><p id="pixExpiry" class="pix-expiry" aria-live="off" hidden></p>
+        <p class="pix-instruction">Pague com Pix</p><p id="pixExpiry" class="pix-expiry" aria-live="off"></p>
         <div class="pix-qr-container">
           <img id="pixQrImage" src="" alt="QR Code PIX" class="pix-qr-image" />
         </div>
