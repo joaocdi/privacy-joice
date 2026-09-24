@@ -24,15 +24,15 @@
 
 // Default profile until /admin → Perfil is saved. Shared by HOME and VIP.
 const profile = {
-  name: 'Nina',
-  username: '@nina',
+  name: 'Maya',
+  username: '@_maya.vl',
   verified: true,
   // Localização exibida no perfil (com o pino, abaixo da bio).
   location: '',
   avatar: '/nina-avatar.svg',
   cover: '/nina-cover.svg',
   // Para acrescentar detalhes (altura, número do pé), escreva direto na frase.
-  bio: 'Oi, eu sou a Nina ♡ Entra, fica à vontade e descobre meu lado mais reservado por aqui.',
+  bio: 'Oi, eu sou a Maya ♡ Entra, fica à vontade e descobre meu lado mais reservado por aqui.',
   /**
    * Números mostrados no perfil e nas abas.
    *   mídias  = photos + videos (calculado, não precisa escrever)

@@ -332,7 +332,7 @@ function buildMediaPost(post, profile) {
       image.decoding = 'async';
       image.addEventListener('error', () => mediaUnavailable(cell, { draft: post.draft }));
       image.src = API_BASE + item.media;
-      image.alt = post.caption || 'Foto exclusiva da Nina';
+      image.alt = post.caption || 'Foto exclusiva da Maya';
       image.loading = index === 0 ? 'eager' : 'lazy';
       cell.append(image);
       JoiceFrame.apply(image, item.crop, { box: cell });

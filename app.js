@@ -77,7 +77,7 @@ function compactNumber(value) {
 function applyProfile(profile) {
   perfilAtual = profile;
   document.body.classList.remove('carregando');
-  try { localStorage.setItem('nina.profile.cache', JSON.stringify(profile)); } catch (_) {}
+  try { localStorage.setItem('maya.profile.cache', JSON.stringify(profile)); } catch (_) {}
   const text = (id, value) => { const el = document.getElementById(id); if (el && value != null) el.textContent = value; };
   text('profileName', profile.name);
   document.querySelectorAll('[data-profile-avatar]').forEach(el => { el.src = profile.avatar; el.alt = profile.name; JoiceFrame.apply(el,profile.avatarCrop,{role:"avatar"}); });
@@ -716,7 +716,7 @@ document.addEventListener('click', event => {
   // Pinta na hora com o perfil da última visita (some o esqueleto no F5);
   // a resposta da API entra por cima em seguida.
   try {
-    const salvo = JSON.parse(localStorage.getItem('nina.profile.cache') || 'null');
+    const salvo = JSON.parse(localStorage.getItem('maya.profile.cache') || 'null');
     if (salvo && typeof salvo.name === 'string') applyProfile(salvo);
   } catch (_) {}
   try {

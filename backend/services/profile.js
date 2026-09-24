@@ -9,9 +9,9 @@ async function read(db) {
 }
 function present(row) {
   // Older installations may still contain the original creator's untouched defaults.
-  return { name: !row?.name || /joice/i.test(row.name) ? defaults.name : row.name,
-    username: !row?.username || /joice|johhh/i.test(row.username) ? defaults.username : row.username,
-    bio: !row?.bio || row.bio.startsWith('Oii sou a joice ><') ? defaults.bio : row.bio.replace(/joice/gi, defaults.name),
+  return { name: !row?.name || /joice/i.test(row.name) || /^nina$/i.test(row.name.trim()) ? defaults.name : row.name,
+    username: !row?.username || /joice|johhh/i.test(row.username) || /^@nina$/i.test(row.username.trim()) ? defaults.username : row.username,
+    bio: !row?.bio || row.bio.startsWith('Oii sou a joice ><') ? defaults.bio : row.bio.replace(/joice|nina/gi, defaults.name),
     verified: Boolean(defaults.verified), stats: defaults.stats,
     location: defaults.location || '',
     avatarCrop: crop.read(row?.avatar_crop, 'avatar'), coverCrop: crop.read(row?.cover_crop, 'cover'),
