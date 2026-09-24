@@ -142,7 +142,7 @@ check('allowlist de arquivos estáticos encontrada', Boolean(allowlist));
 if (allowlist) {
   const lista = allowlist[1].split(',').map((item) => item.trim().replace(/['"]/g, '')).filter(Boolean);
   check('allowlist só tem página, script, estilo e imagem de perfil',
-    lista.every((item) => /^(index\.html|legal\.html|analytics\.js|continue\.(?:html|js)|push(?:-sw)?\.js|app\.js|pix-notification\.js|style\.css|vip\.(html|css|js)|buyer-account\.(html|css|js)|pending-checkouts\.js|image-tools\.js|fonts\.css|avatar\.jpg|cover\.jpg|verified-joice\.png|favicon\.ico|login\.(html|css|js)|admin-mode\.(css|js)|admin-loader\.js|frame\.(css|js)|carousel\.(css|js)|tips\.(css|js))$/.test(item)),
+    lista.every((item) => /^(index\.html|legal\.html|analytics\.js|continue\.(?:html|js)|push(?:-sw)?\.js|app\.js|pix-notification\.js|style\.css|vip\.(html|css|js)|buyer-account\.(html|css|js)|pending-checkouts\.js|image-tools\.js|fonts\.css|avatar\.jpg|cover\.jpg|verified-joice\.png|favicon\.(?:ico|svg)|login\.(html|css|js)|admin-mode\.(css|js)|admin-loader\.js|frame\.(css|js)|carousel\.(css|js)|tips\.(css|js))$/.test(item)),
     lista.join(' '));
 }
 

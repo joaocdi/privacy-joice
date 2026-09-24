@@ -79,7 +79,7 @@
       ]
     },
     {
-      "source": "/:asset(nina-avatar.svg|nina-cover.svg|verified-nina.png|favicon.ico)",
+      "source": "/:asset(nina-avatar.svg|nina-cover.svg|verified-nina.png|favicon.svg|favicon.ico)",
       "headers": [
         {
           "key": "Cache-Control",

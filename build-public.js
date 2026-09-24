@@ -22,7 +22,7 @@ const CASCA = [
   'login.js', 'login.css', 'buyer-account.js', 'buyer-account.css',
   'admin-loader.js', 'admin-mode.js', 'admin-mode.css', 'pending-checkouts.js', 'pix-notification.js',
   'analytics.js', 'push.js', 'push-sw.js', 'continue.html', 'continue.js',
-  'nina-avatar.svg', 'nina-cover.svg', 'favicon.ico',
+  'nina-avatar.svg', 'nina-cover.svg', 'favicon.svg', 'favicon.ico',
 ];
 
 const OUT = 'public';
