@@ -1833,7 +1833,7 @@ body { background: #ecebe9; }
 .contact-chat header small { font-size:10px; }
 .contact-name-row { display:flex; align-items:center; gap:7px; }
 .contact-online-dot { flex:0 0 8px; width:8px; height:8px; border-radius:50%; background:#209b50; box-shadow:0 0 0 2px #ffffff70; }
-.contact-chat header .contact-online-label { margin-top:2px; font-size:11px; line-height:1.4; font-weight:400; color:#334438; }
+.contact-chat header .contact-online-label { display:flex; align-items:center; gap:5px; margin-top:2px; font-size:11px; line-height:1.4; font-weight:400; color:#334438; }
 .contact-chat header button { margin-left:auto; background:none; border:0; width:36px; height:36px; font-size:25px; cursor:pointer; }
 .contact-chat-messages { padding:16px; min-height:210px; overflow:auto; }
 .contact-chat-messages p { background:#fff1e5; padding:12px; border-radius:3px 16px 16px; margin:0 16px 12px 0; }
