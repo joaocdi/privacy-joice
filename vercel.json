@@ -12,6 +12,10 @@
   },
   "rewrites": [
     {
+      "source": "/maya",
+      "destination": "/maya/index.html"
+    },
+    {
       "source": "/continuar",
       "destination": "/continue.html"
     },

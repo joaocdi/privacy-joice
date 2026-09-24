@@ -37,5 +37,6 @@ for (const nome of CASCA.concat(selo)) {
 }
 if (fs.existsSync('previews')) fs.cpSync('previews', path.join(OUT, 'previews'), { recursive: true });
 fs.cpSync('fonts', path.join(OUT, 'fonts'), { recursive: true });
+if (fs.existsSync('maya')) fs.cpSync('maya', path.join(OUT, 'maya'), { recursive: true });
 
 console.log('casca estática: ' + copiados.length + ' arquivo(s) + fontes em public/');

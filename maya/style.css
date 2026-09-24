@@ -1,0 +1,369 @@
+/* Fonte do nome (Lobster — licença SIL OFL) */
+@font-face {
+  font-family: "Lobster";
+  src: url("assets/lobster.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ===== Identidade visual — Maya ===== */
+:root {
+  --bg: #12050b;
+  --shell-bg: #2a0c19;
+  --accent: #ff5c93;
+  --accent-2: #ffb3c7;
+  --glow: 255, 92, 147;
+  --shade: 10, 2, 6;
+  --shell-w: 440px;
+}
+
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+[hidden] { display: none !important; }
+
+html, body { margin: 0; padding: 0; }
+
+html {
+  background: var(--bg);
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  overscroll-behavior-y: none;
+}
+
+body {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background:
+    radial-gradient(60% 50% at 50% 0%, rgba(var(--glow), 0.14), transparent 70%),
+    var(--bg);
+  color: #fff;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ===== Container mobile ===== */
+.shell {
+  position: relative;
+  width: 100%;
+  max-width: var(--shell-w);
+  min-height: 100vh;
+  min-height: 100svh;
+  margin: 0 auto;
+  overflow: hidden;
+  isolation: isolate;
+  background: var(--shell-bg);
+  display: flex;
+  flex-direction: column;
+}
+
+.hero {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+  z-index: -2;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(to bottom,
+      rgba(var(--shade), 0.30) 0%,
+      rgba(var(--shade), 0) 18%,
+      rgba(var(--shade), 0.06) 34%,
+      rgba(var(--shade), 0.58) 50%,
+      rgba(var(--shade), 0.88) 68%,
+      rgba(var(--shade), 0.97) 100%);
+}
+
+/* ===== Conteúdo ===== */
+.content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  text-align: center;
+  padding: 32px 22px calc(max(104px, 15vh) + env(safe-area-inset-bottom));
+  padding: 32px 22px calc(max(104px, 15svh) + env(safe-area-inset-bottom));
+}
+
+.name {
+  margin: 0;
+  font-family: "Lobster", "Brush Script MT", cursive;
+  font-size: 46px;
+  line-height: 1;
+  font-weight: 400;
+  font-synthesis: none;
+  letter-spacing: 0.005em;
+  text-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.35),
+    0 2px 16px rgba(0, 0, 0, 0.3);
+}
+
+.verified {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.45));
+}
+
+.handle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 4px 0 0;
+  font-size: 14px;
+  font-weight: 400;
+  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.8);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55), 0 0 12px rgba(0, 0, 0, 0.35);
+  word-break: break-all;
+}
+
+.cue {
+  margin: 22px 0 16px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.3em;
+  color: var(--accent-2);
+  opacity: 0.92;
+}
+
+/* traço fino acima do "ESTOU AQUI" */
+.cue::before {
+  content: "";
+  display: block;
+  width: 48px;
+  height: 1px;
+  margin: 0 auto 16px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+}
+
+.cue span { letter-spacing: 0; }
+
+/* ===== Botões ===== */
+.ctas {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 54px;
+  padding: 8px 18px 8px 9px;
+  border-radius: 999px;
+  color: #fff;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+  isolation: isolate;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.2s ease;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* brilho superior + contorno fino */
+.btn::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0) 50%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* reflexo que atravessa o botão */
+.btn::before {
+  content: "";
+  position: absolute;
+  top: -20%;
+  bottom: -20%;
+  left: -50%;
+  width: 30%;
+  background: linear-gradient(90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.32) 50%,
+    rgba(255, 255, 255, 0) 100%);
+  transform: skewX(-22deg) translateX(0);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.btn__icon {
+  position: relative;
+  z-index: 2;
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28);
+}
+
+.btn__icon img {
+  display: block;
+  width: 22px;
+  height: 22px;
+}
+
+.btn__label {
+  position: relative;
+  z-index: 2;
+  flex: 1;
+  text-align: center;
+  padding-right: 36px;
+}
+
+.btn--telegram {
+  background: linear-gradient(120deg, #41c7ff 0%, #1ea1f7 45%, #137cf0 100%);
+  box-shadow: 0 4px 14px rgba(30, 150, 245, 0.24);
+}
+
+.btn--site {
+  background: linear-gradient(100deg, #4a63c2 0%, #8a55b8 20%, #cf4a5e 40%, #de7a34 60%, #d9aa2f 78%, #45a04a 100%);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+}
+
+/* colorido suave: leve escurecida por cima do degradê */
+.btn--site::after {
+  background:
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0) 50%),
+    rgba(0, 0, 0, 0.12);
+}
+
+/* botão "Não tem Telegram?": texto mais longo e selo à direita */
+.btn--site .btn__label {
+  padding: 0 4px;
+  font-size: 13px;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.btn__badge {
+  position: relative;
+  z-index: 2;
+  flex: 0 0 36px;
+  display: grid;
+  place-items: center;
+}
+
+.btn__badge span {
+  display: grid;
+  place-items: center;
+  min-width: 28px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.22);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.3);
+}
+
+.btn:hover { filter: brightness(1.07); }
+.btn:active { transform: scale(0.975); }
+
+.btn:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .btn::before { animation: shine 4.2s ease-in-out infinite; }
+  .ctas .btn:nth-child(2)::before { animation-delay: 0.5s; }
+  @keyframes shine {
+    0%        { transform: skewX(-22deg) translateX(0); }
+    40%, 100% { transform: skewX(-22deg) translateX(620%); }
+  }
+}
+
+/* ===== Rodapé fixo no fim da tela ===== */
+.note {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(22px + env(safe-area-inset-bottom));
+  margin: 0;
+  text-align: center;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.42);
+}
+
+/* ===== Entrada suave ===== */
+@media (prefers-reduced-motion: no-preference) {
+  .content > * { animation: rise 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+  .content > :nth-child(2) { animation-delay: 0.04s; }
+  .content > :nth-child(3) { animation-delay: 0.08s; }
+  .content > :nth-child(4) { animation-delay: 0.12s; }
+  .content > :nth-child(5) { animation-delay: 0.18s; }
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: none; }
+  }
+  .content > .note { animation-name: fade; }
+  @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+}
+
+/* ===== Telas bem pequenas (320px) ===== */
+@media (max-width: 350px) {
+  .content { padding-left: 16px; padding-right: 16px; }
+  .name { font-size: 40px; }
+  .verified { width: 13px; height: 13px; }
+  .btn { min-height: 50px; font-size: 12.5px; letter-spacing: 0.09em; }
+  .btn__icon { flex-basis: 32px; width: 32px; height: 32px; }
+  .btn__label { padding-right: 32px; }
+  .btn--site .btn__label { font-size: 11px; letter-spacing: 0; padding: 0 2px; }
+  .btn__badge { flex-basis: 32px; }
+  .btn__badge span { min-width: 24px; height: 20px; padding: 0 5px; }
+}
+
+@media (max-height: 620px) {
+  .content { padding-top: 16px; padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
+  .cue { margin: 14px 0 12px; }
+  .cue::before { margin-bottom: 12px; }
+  .note { bottom: calc(16px + env(safe-area-inset-bottom)); }
+}
+
+/* ===== Desktop: mantém a proporção de celular, centralizado ===== */
+@media (min-width: 600px) and (min-height: 700px) {
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 16px;
+  }
+  .shell {
+    min-height: 0;
+    height: min(900px, calc(100vh - 64px));
+    border-radius: 32px;
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.06),
+      0 40px 100px rgba(0, 0, 0, 0.6);
+  }
+}
