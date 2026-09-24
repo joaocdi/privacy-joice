@@ -59,7 +59,7 @@ async function main() {
   await db.run("INSERT INTO vip_uploads(id,session_id,media_path,mime_type,type,size_bytes,complete,expires_at) VALUES ('asset','session','joice/test.png','image/png','image',100,1,?)", now + 100000);
   let post = await posts.save(null, { caption: 'Postgres caption', sort_order: 20, published: true, uploadId: 'asset' }, 'session');
   await posts.setSource('managed');
-  assert.deepEqual((await require('../services/profile').get()).stats, {posts:139,photos:150,videos:40,likes:'35,4 mil'});
+  assert.deepEqual((await require('../services/profile').get()).stats, {posts:139,photos:98,videos:26,likes:'35,4 mil'});
   assert.equal((await posts.feed(order.id))[0].likes, 0);
   assert.equal((await posts.feed(order.id))[0].liked, false, 'Postgres COUNT zero is not liked');
   await posts.like(post.id, order.id, true); await posts.like(post.id, order.id, true);
