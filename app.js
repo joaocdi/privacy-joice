@@ -416,8 +416,9 @@ function openPaidAccount(pending, needsClaim) {
 }
 let pixTimer=null;const pendingSeen=new Set();const priorPending=new Set((window.JoiceCheckouts?.list()||[]).map(x=>x.payment?.orderId).filter(Boolean));
 function startPixTimer(expiresAt,version,token){clearInterval(pixTimer);const target=document.getElementById('pixExpiry');const ms=expiresAt?Date.parse(String(expiresAt).replace(' ','T')+(String(expiresAt).includes('Z')?'':'Z')):NaN;
- if(!Number.isFinite(ms)){target.textContent='';return;}
- const tick=()=>{if(version!==checkoutVersion){clearInterval(pixTimer);return;}const left=Math.max(0,Math.ceil((ms-Date.now())/1000));target.textContent=left?('Tempo restante: '+String(Math.floor(left/60)).padStart(2,'0')+':'+String(left%60).padStart(2,'0')):'Prazo encerrado';if(!left){clearInterval(pixTimer);window.FunnelAnalytics?.track('pix_expired',selectedProduct,currentOrderId);showRegenerate(true,selectedProduct);}};tick();pixTimer=setInterval(tick,1000);
+ target.hidden=!Number.isFinite(ms);target.classList.remove('is-urgent');
+ if(target.hidden){target.textContent='';return;}
+ const tick=()=>{if(version!==checkoutVersion){clearInterval(pixTimer);return;}const left=Math.max(0,Math.ceil((ms-Date.now())/1000));target.textContent=left?('Este PIX expira em '+String(Math.floor(left/60)).padStart(2,'0')+':'+String(left%60).padStart(2,'0')):'Prazo do PIX encerrado';target.classList.toggle('is-urgent',left>0&&left<=300);if(!left){clearInterval(pixTimer);window.FunnelAnalytics?.track('pix_expired',selectedProduct,currentOrderId);showRegenerate(true,selectedProduct);}};tick();if(ms>Date.now())pixTimer=setInterval(tick,1000);
 }
 function showRegenerate(enabled,productId){const fresh=document.getElementById('pixRegenerate'),small=document.getElementById('pixSmallerPlan');if(!fresh)return;fresh.hidden=!enabled;small.hidden=!enabled||['monthly','ayla_monthly','whatsapp_unlock','ayla_whatsapp_unlock'].includes(productId);fresh.onclick=()=>location.assign('/continuar?order='+encodeURIComponent(currentOrderId)+'&regen=1');small.onclick=()=>location.assign('/continuar?order='+encodeURIComponent(currentOrderId)+'&smaller=1');}
 let pendingNoticeVersion = 0;
