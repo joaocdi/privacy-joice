@@ -5,7 +5,7 @@
 // =====================================================
 const links = {
   telegram: "https://t.me/mayavl_vip",
-  privacy: "https://privacy-joice.vercel.app/"
+  privacy: "https://maya.ofc.bio/"
 };
 
 // -----------------------------------------------------
