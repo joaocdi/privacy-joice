@@ -797,9 +797,11 @@ body { background: #ecebe9; }
   background: #242124;
 }
 .vip-feed .vip-media .car-cell {
+  position: relative;
   display: grid;
   place-items: center;
-  background: radial-gradient(ellipse at center, #544c4d, #242124 72%);
+  isolation: isolate;
+  background: #242124;
 }
 .vip-feed .vip-media .car-cell > img,
 .vip-feed .vip-media .car-cell > video {
@@ -813,5 +815,25 @@ body { background: #ecebe9; }
   object-fit: contain;
   background: transparent;
 }
-.vip-feed .vip-media .car-cell > video { background: #242124; }
+.vip-feed .vip-media .car-cell > img:not(.vip-media-backdrop),
+.vip-feed .vip-media .car-cell > video {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  z-index: 1;
+}
+.vip-feed .vip-media .car-cell > .vip-media-backdrop {
+  position: absolute;
+  inset: -24px;
+  width: calc(100% + 48px);
+  height: calc(100% + 48px);
+  max-width: none;
+  max-height: none;
+  object-fit: cover;
+  filter: blur(22px) brightness(.72);
+  opacity: 0;
+  pointer-events: none;
+}
+.vip-feed .vip-media .car-cell > .vip-media-backdrop.is-painted { opacity: 1; }
 .vip-feed.is-grid .vip-media { aspect-ratio: 1 / 1; }
