@@ -75,10 +75,15 @@ function mediaUnavailable(cell, { draft }) {
 
 const vipVideoObserver = new IntersectionObserver(entries => {
   for (const entry of entries) {
-    if (entry.isIntersecting) entry.target.preload = 'metadata';
+    if (entry.isIntersecting && entry.target.preload !== 'auto') entry.target.preload = 'metadata';
     else if (!entry.target.paused) entry.target.pause();
   }
 }, { rootMargin: '450px 0px', threshold: 0 });
+const vipVisibleVideoObserver = new IntersectionObserver(entries => {
+  for (const entry of entries) {
+    if (entry.isIntersecting) entry.target.preload = 'auto';
+  }
+}, { threshold: 0.01 });
 let currentProfile = {};
 let returnFocus = null;
 
@@ -259,13 +264,14 @@ function render(data) {
 
 function renderFeed(filter) {
   vipVideoObserver.disconnect();
+  vipVisibleVideoObserver.disconnect();
   const feed = currentFeed.filter(post => post.type !== 'cta' && (filter === 'all' || post.type === filter));
-  $('vipFeed').replaceChildren(...feed.map(post => buildPost(post, currentProfile)));
+  $('vipFeed').replaceChildren(...feed.map((post, position) => buildPost(post, currentProfile, position === 0)));
   $('vipEmpty').hidden = feed.length > 0;
 }
 
-function buildPost(post, profile) {
-  return post.type === 'cta' ? buildPromo(post) : buildMediaPost(post, profile);
+function buildPost(post, profile, priority = false) {
+  return post.type === 'cta' ? buildPromo(post) : buildMediaPost(post, profile, priority);
 }
 
 /** Bloco de chamada. Hoje só informa — a venda do contato segue desativada. */
@@ -292,7 +298,7 @@ function buildPromo(post) {
   return section;
 }
 
-function buildMediaPost(post, profile) {
+function buildMediaPost(post, profile, priority = false) {
   const article = document.createElement('article');
   article.className = 'vip-post';
   article.dataset.postId = post.id;
@@ -361,11 +367,13 @@ function buildMediaPost(post, profile) {
         await renewVideo();
       });
       video.src = API_BASE + item.media;
+      if (typeof item.poster === 'string' && item.poster.startsWith('data:image/jpeg;base64,')) video.poster = item.poster;
       video.controls = true;
       video.playsInline = true;
       // Só o primeiro pede metadados; os outros só quando chegam perto.
       video.preload = 'none';
       vipVideoObserver.observe(video);
+      vipVisibleVideoObserver.observe(video);
       video.setAttribute('playsinline', '');
       video.setAttribute('controlsList', 'nodownload');
       cell.append(video);
@@ -397,9 +405,10 @@ function buildMediaPost(post, profile) {
         try { image.src = await freshMediaUrl(post, item); }
         catch (_) { mediaUnavailable(cell, { draft: post.draft }); }
       });
-      image.src = API_BASE + item.media;
       image.alt = post.caption || 'Foto exclusiva da Maya';
-      image.loading = index === 0 ? 'eager' : 'lazy';
+      image.loading = priority && index === 0 ? 'eager' : 'lazy';
+      if (priority && index === 0) image.fetchPriority = 'high';
+      image.src = API_BASE + item.media;
       cell.append(image);
     }
   }), {
