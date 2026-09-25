@@ -816,6 +816,14 @@ body { background: #ecebe9; }
 .vip-feed:not(.is-grid) .vip-media.is-landscape { aspect-ratio: 16 / 9; }
 .vip-feed.is-grid .vip-media .car-cell.is-landscape > :is(img, video) { object-fit: cover; }
 .vip-feed .vip-media .car-cell > video { background: transparent; }
+.vip-feed .vip-media .car-cell > video { z-index: 1; }
+.vip-feed .vip-media .car-cell > .vip-video-cover,
+.vip-feed .vip-media .car-cell.is-landscape > .vip-video-cover {
+  z-index: 2;
+  object-fit: cover;
+  pointer-events: none;
+}
+.vip-feed .vip-media .car-cell.vip-video-playing > .vip-video-cover { display: none; }
 .vip-feed .vip-video-play {
   top: 50%; left: 50%; transform: translate(-50%, -50%);
   width: 56px; height: 56px;
