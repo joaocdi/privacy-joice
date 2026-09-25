@@ -371,7 +371,13 @@ function buildMediaPost(post, profile, priority = false) {
         if (Number(box.dataset.activeIndex || 0) === index) box.classList.toggle('is-landscape', video.videoWidth > video.videoHeight);
       });
       video.src = API_BASE + item.media;
-      if (typeof item.poster === 'string' && item.poster.startsWith('data:image/jpeg;base64,')) video.poster = item.poster;
+      if (typeof item.poster === 'string' && item.poster.startsWith('data:image/jpeg;base64,')) {
+        const cover = document.createElement('img');
+        cover.className = 'vip-video-cover';
+        cover.src = item.poster;
+        cover.alt = '';
+        cell.append(cover);
+      }
       video.controls = true;
       video.playsInline = true;
       // Só o primeiro pede metadados; os outros só quando chegam perto.
@@ -394,7 +400,7 @@ function buildMediaPost(post, profile, priority = false) {
         video.preload = 'auto';
         video.play().catch(() => { playButton.hidden = false; playButton.textContent = '▶'; playButton.classList.remove('is-loading'); });
       });
-      video.addEventListener('playing', () => { playButton.hidden = true; playButton.classList.remove('is-loading'); });
+      video.addEventListener('playing', () => { cell.classList.add('vip-video-playing'); playButton.hidden = true; playButton.classList.remove('is-loading'); });
       video.addEventListener('waiting', () => { playButton.hidden = false; playButton.textContent = 'Carregando…'; playButton.classList.add('is-loading'); });
       video.addEventListener('pause', () => { playButton.hidden = false; playButton.textContent = '▶'; });
       video.addEventListener('ended', () => { playButton.hidden = false; playButton.textContent = '▶'; });
