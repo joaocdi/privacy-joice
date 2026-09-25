@@ -266,6 +266,44 @@ function isSafePreviewItem(item) {
   return foto || video;
 }
 
+// Só duplica a amostra pública que já veio do servidor. Nunca usa o arquivo
+// privado: no vídeo liberado, desenha alguns quadros em um canvas pequeno.
+function addHomeBackdrop(container, src) {
+  if (!src) return;
+  const backdrop = document.createElement('img');
+  backdrop.className = 'home-media-backdrop';
+  backdrop.alt = '';
+  backdrop.setAttribute('aria-hidden', 'true');
+  backdrop.loading = 'lazy';
+  backdrop.src = src;
+  container.prepend(backdrop);
+}
+
+function addPublicVideoBackdrop(container, video) {
+  const backdrop = document.createElement('canvas');
+  backdrop.className = 'home-media-backdrop';
+  backdrop.setAttribute('aria-hidden', 'true');
+  backdrop.width = 80;
+  backdrop.height = 100;
+  container.prepend(backdrop);
+  const context = backdrop.getContext('2d');
+  let lastFrame = 0;
+  function paint() {
+    if (!context || !video.videoWidth || !video.videoHeight || !video.isConnected) return;
+    if (performance.now() - lastFrame < 450) return;
+    lastFrame = performance.now();
+    try {
+      const scale = Math.max(backdrop.width / video.videoWidth, backdrop.height / video.videoHeight);
+      const width = video.videoWidth * scale, height = video.videoHeight * scale;
+      context.drawImage(video, (backdrop.width - width) / 2, (backdrop.height - height) / 2, width, height);
+      backdrop.classList.add('is-painted');
+    } catch (_) { /* Sem fundo animado, a reprodução continua normal. */ }
+  }
+  video.addEventListener('loadeddata', paint);
+  video.addEventListener('seeked', paint);
+  video.addEventListener('timeupdate', paint);
+}
+
 /**
  * O carrossel bloqueado da HOME.
  *
@@ -276,7 +314,7 @@ function isSafePreviewItem(item) {
 function mountLockedCarousel(locked, overlay, items, teaserSeconds) {
   // O pôster e o teaser do primeiro item já foram montados por fora; o
   // carrossel reconstrói tudo em células para poder deslizar.
-  locked.querySelectorAll('.locked-img, .locked-video, .locked-replay').forEach(node => node.remove());
+  locked.querySelectorAll('.locked-img, .locked-video, .locked-replay, .home-media-backdrop').forEach(node => node.remove());
   locked.classList.remove('has-teaser');
 
   JoiceCarousel.build(locked, items.map((item, index) => (cell) => {
@@ -288,11 +326,10 @@ function mountLockedCarousel(locked, overlay, items, teaserSeconds) {
     image.loading = index === 0 ? 'eager' : 'lazy';
     image.width = 64; image.height = 80;
     cell.append(image);
-    JoiceFrame.apply(image, item.crop, { box: cell, preview: true });
+    addHomeBackdrop(cell, item.preview);
     if (item.type === 'video' && typeof item.teaser === 'string' && item.teaser.startsWith('/api/home/preview-video/')) {
       cell.classList.add('has-teaser');
       const video = mountTeaser(cell, { src: API_BASE + item.teaser, seconds: teaserSeconds, poster: item.preview, overlay: null });
-      JoiceFrame.apply(video, item.crop, { box: cell, preview: true });
     }
   }), {
     onEnter: video => { video.play?.().catch(() => {}); }
@@ -796,13 +833,12 @@ document.addEventListener('click', event => {
       overlay.className = 'locked-overlay';
       overlay.innerHTML = overlayModel;
       locked.append(image, overlay);
-      JoiceFrame.apply(image, item.crop, { box: locked, preview: true });
+      addHomeBackdrop(locked, item.preview);
       // Vídeo com teaser derivado: o <video> entra por cima do pôster, que fica
       // atrás como primeiro quadro e como plano B se o autoplay for bloqueado.
       if (item.type === 'video' && typeof item.teaser === 'string' && item.teaser.startsWith('/api/home/preview-video/')) {
         locked.classList.add('has-teaser');
         const video = mountTeaser(locked, { src: API_BASE + item.teaser, seconds: item.teaserSeconds, poster: item.preview, overlay });
-        JoiceFrame.apply(video, item.crop, { box: locked, preview: true });
       }
       // Carrossel bloqueado: só entram itens que trazem a SUA derivada segura —
       // a amostra minúscula da foto ou a rota do teaser do vídeo. Item sem
@@ -819,7 +855,8 @@ document.addEventListener('click', event => {
           if (media.type === 'video') { element.controls=true; element.playsInline=true; element.preload='metadata'; }
           else { element.alt=item.caption || 'Publicação pública'; element.loading='lazy'; }
           cell.append(element);
-          JoiceFrame.apply(element, media.crop, {box:cell});
+          if (media.type === 'video') addPublicVideoBackdrop(cell, element);
+          else addHomeBackdrop(cell, element.src);
         }));
       }
       fragment.append(header, locked);
