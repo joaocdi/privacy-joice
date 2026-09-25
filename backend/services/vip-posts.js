@@ -144,7 +144,8 @@ async function withMedia(db, rows) {
     const items = byPost.get(row.id) || [];
     return { ...asFeed(row), media: items.map((item, index) => ({
       id: item.id, type: item.type, source: item.media_path,
-      mediaDriver: item.media_driver, crop: crop.read(item.crop_data), position: index
+      mediaDriver: item.media_driver, crop: crop.read(item.crop_data), position: index,
+      poster: item.type === 'video' ? previewImage.dataUri(item.preview_image) : null
     })) };
   });
 }
