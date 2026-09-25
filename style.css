@@ -2086,8 +2086,8 @@ body.carregando .stats-row span { color:#dcd8d5; }
   object-fit: cover;
   transform: none;
 }
-.content-section .preview-post .locked-post.is-landscape > :is(.locked-img, .locked-video),
-.content-section .preview-post .locked-post .car-cell.is-landscape > :is(.locked-img, .locked-video, img, video) { object-fit: contain; }
+/* Prévia de venda: a derivada preenche a moldura mesmo quando o original é
+   horizontal. Evita a tira estreita cercada por grandes faixas vazias. */
 .content-section .preview-post .locked-post > .locked-video,
 .content-section .preview-post .locked-post .car-cell > .locked-video { z-index: 1; }
 /* O pôster estático é reserva para antes e depois do teaser. Quando o vídeo
