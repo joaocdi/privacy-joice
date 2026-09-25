@@ -829,9 +829,32 @@ document.addEventListener('click', event => {
         JoiceCarousel.build(locked, publicItems.filter(media => media.publicUrl?.startsWith('/api/home/public-media/')).map(media => cell => {
           const element = document.createElement(media.type === 'video' ? 'video' : 'img');
           if (media.type === 'video') {
-            element.controls=true; element.playsInline=true; element.preload='none';
+            element.controls=false; element.playsInline=true; element.preload='none';
             const poster = media.preview || item.preview;
-            if (typeof poster === 'string' && poster.startsWith('data:image/jpeg;base64,')) element.poster=poster;
+            // O pôster nativo do <video> é encaixado pelo navegador antes de
+            // conhecer a proporção do arquivo. Uma imagem separada com cover
+            // já ocupa a moldura inteira, inclusive antes de apertar play.
+            const cover = document.createElement('img');
+            cover.className = 'public-video-cover';
+            cover.alt = '';
+            if (typeof poster === 'string' && poster.startsWith('data:image/jpeg;base64,')) cover.src = poster;
+            const play = document.createElement('button');
+            play.type = 'button';
+            play.className = 'public-video-play';
+            play.textContent = '▶';
+            play.setAttribute('aria-label', 'Reproduzir vídeo');
+            play.addEventListener('click', event => {
+              event.stopPropagation();
+              play.textContent = 'Carregando…';
+              element.preload = 'auto';
+              element.play().catch(() => { play.textContent = '▶'; });
+            });
+            element.addEventListener('playing', () => {
+              cell.classList.add('public-video-playing');
+              element.controls = true;
+            });
+            element.addEventListener('error', () => { play.textContent = '▶'; });
+            cell.append(cover, play);
           }
           else { element.alt=item.caption || 'Publicação pública'; element.loading='lazy'; }
           element.src = API_BASE + media.publicUrl;
