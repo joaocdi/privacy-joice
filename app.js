@@ -240,7 +240,12 @@ function mountTeaser(locked, { src, seconds, poster, overlay }) {
     else video.pause();
   };
   const observer = new IntersectionObserver(entries => {
-    for (const entry of entries) { visible = entry.isIntersecting && entry.intersectionRatio >= .25; resume(); }
+    for (const entry of entries) {
+      const entering = entry.isIntersecting && entry.intersectionRatio >= .25;
+      if (entering && !visible && finished) finished = false;
+      visible = entering;
+      resume();
+    }
   }, { threshold: [0, .25] });
   observer.observe(video);
   document.addEventListener('visibilitychange', resume);
@@ -280,6 +285,31 @@ const publicVideoObserver = new IntersectionObserver(entries => {
     publicVideoObserver.unobserve(entry.target);
   }
 }, { rootMargin: '450px 0px', threshold: 0 });
+
+// Publicações gratuitas tocam sem som quando entram no campo de visão.
+// Uma única publicação visível toca; ao sair ou trocar de aba ela pausa.
+const publicAutoplayVideos = new Set();
+const publicVideoAutoplayObserver = new IntersectionObserver(entries => {
+  for (const entry of entries) {
+    const video = entry.target;
+    if (entry.isIntersecting && entry.intersectionRatio >= .5 && !document.hidden && !document.body.classList.contains('age-pending')) {
+      video.muted = true;
+      video.preload = 'auto';
+      video.play().catch(() => {}); // botão manual continua disponível
+    } else video.pause();
+  }
+}, { threshold: [0, .5] });
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) publicAutoplayVideos.forEach(video => video.pause());
+  else publicAutoplayVideos.forEach(video => {
+    const rect = video.getBoundingClientRect();
+    const visibleHeight = Math.min(rect.bottom, innerHeight) - Math.max(rect.top, 0);
+    if (visibleHeight >= rect.height * .5 && video.isConnected) {
+      video.muted = true;
+      video.play().catch(() => {});
+    }
+  });
+});
 
 /**
  * O carrossel bloqueado da HOME.
@@ -830,6 +860,8 @@ document.addEventListener('click', event => {
           const element = document.createElement(media.type === 'video' ? 'video' : 'img');
           if (media.type === 'video') {
             element.controls=false; element.playsInline=true; element.preload='none';
+            element.muted = true; element.defaultMuted = true;
+            element.setAttribute('muted', ''); element.setAttribute('playsinline', '');
             const poster = media.preview || item.preview;
             // O pôster nativo do <video> é encaixado pelo navegador antes de
             // conhecer a proporção do arquivo. Uma imagem separada com cover
@@ -865,7 +897,11 @@ document.addEventListener('click', event => {
             setMediaOrientation(cell, media.type === 'video' ? element.videoWidth : element.naturalWidth, media.type === 'video' ? element.videoHeight : element.naturalHeight);
           });
           cell.append(element);
-          if (media.type === 'video') publicVideoObserver.observe(element);
+          if (media.type === 'video') {
+            publicAutoplayVideos.add(element);
+            publicVideoObserver.observe(element);
+            publicVideoAutoplayObserver.observe(element);
+          }
         }));
       }
       fragment.append(header, locked);
