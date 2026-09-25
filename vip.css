@@ -813,6 +813,8 @@ body { background: #ecebe9; }
   background: transparent;
 }
 .vip-feed .vip-media .car-cell.is-landscape > :is(img, video) { object-fit: contain; }
+.vip-feed:not(.is-grid) .vip-media.is-landscape { aspect-ratio: 16 / 9; }
+.vip-feed.is-grid .vip-media .car-cell.is-landscape > :is(img, video) { object-fit: cover; }
 .vip-feed .vip-media .car-cell > video { background: transparent; }
 .vip-feed .vip-video-play {
   top: 50%; left: 50%; transform: translate(-50%, -50%);
