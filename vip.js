@@ -368,6 +368,7 @@ function buildMediaPost(post, profile, priority = false) {
       });
       video.addEventListener('loadedmetadata', () => {
         cell.classList.toggle('is-landscape', video.videoWidth > video.videoHeight);
+        if (Number(box.dataset.activeIndex || 0) === index) box.classList.toggle('is-landscape', video.videoWidth > video.videoHeight);
       });
       video.src = API_BASE + item.media;
       if (typeof item.poster === 'string' && item.poster.startsWith('data:image/jpeg;base64,')) video.poster = item.poster;
@@ -411,6 +412,7 @@ function buildMediaPost(post, profile, priority = false) {
       image.alt = post.caption || 'Foto exclusiva da Maya';
       image.addEventListener('load', () => {
         cell.classList.toggle('is-landscape', image.naturalWidth > image.naturalHeight);
+        if (Number(box.dataset.activeIndex || 0) === index) box.classList.toggle('is-landscape', image.naturalWidth > image.naturalHeight);
       });
       image.loading = priority && index === 0 ? 'eager' : 'lazy';
       if (priority && index === 0) image.fetchPriority = 'high';
@@ -418,6 +420,10 @@ function buildMediaPost(post, profile, priority = false) {
       cell.append(image);
     }
   }), {
+    onChange: index => {
+      box.dataset.activeIndex = String(index);
+      box.classList.toggle('is-landscape', !!box.querySelector(`.car-cell[data-index="${index}"].is-landscape`));
+    },
     // O vídeo que entra em cena volta a poder tocar; o que sai já foi pausado.
     onEnter: video => {
       const bounds = video.getBoundingClientRect();
