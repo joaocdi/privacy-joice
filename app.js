@@ -556,6 +556,7 @@ async function openCheckout(productId, resumeToken = null) {
   currentOrderId = null;
   openModal('checkoutModalOverlay');
   document.getElementById('pixActiveArea').style.display = 'none';
+  document.getElementById('checkoutConfirmPix').hidden = true;
   const consentimento = document.getElementById('checkoutConsent');
   if (consentimento) consentimento.hidden = false;
 
@@ -573,6 +574,13 @@ async function openCheckout(productId, resumeToken = null) {
     if (!product) { checkoutError('Este produto ainda não está disponível para compra.'); return; }
     document.getElementById('checkoutPlanLabel').textContent = product.name;
     document.getElementById('checkoutPlanPrice').textContent = product.price.toLocaleString('pt-BR', {style:'currency',currency:'BRL'});
+    const offerDetails = {
+      monthly: '30 dias de acesso ao conteúdo VIP da Maya.',
+      quarterly: '90 dias de acesso ao conteúdo VIP da Maya.',
+      semester: '180 dias de acesso ao conteúdo VIP da Maya.',
+      whatsapp_unlock: 'Desbloqueio avulso do contato privado no WhatsApp. Não inclui acesso VIP nem garante resposta imediata.'
+    };
+    document.getElementById('checkoutOfferDetails').textContent = (offerDetails[selectedProduct] || product.name) + ' Valor total: ' + product.price.toLocaleString('pt-BR', {style:'currency',currency:'BRL'}) + '. Pagamento único via PIX, sem renovação automática e sem taxa adicional obrigatória.';
     const pending = saved;
     if (pending?.payment?.orderId) {
       const status = await pendingPixStatus(pending);
@@ -587,7 +595,10 @@ async function openCheckout(productId, resumeToken = null) {
       if (status.status === 'PENDING') { const fresh=await fetch(API_BASE+'/api/orders/'+encodeURIComponent(pending.payment.orderId)+'/pix',{headers:{Authorization:'Bearer '+pending.token},signal:AbortSignal.timeout(10000)});if(fresh.ok){showBuyerPix(await fresh.json(),version,pending.token);return;} }
     }
     fetch(API_BASE+'/api/conversions/checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({productId:selectedProduct,checkoutToken:currentCheckoutToken}),signal:AbortSignal.timeout(5000)}).catch(()=>{});
-    await createCheckoutPix(version);
+    document.getElementById('pixLoadingState').style.display = 'none';
+    const confirm = document.getElementById('checkoutConfirmPix');
+    confirm.hidden = false;
+    confirm.onclick = () => { confirm.hidden = true; createCheckoutPix(version); };
   } catch (error) {
     if (version === checkoutVersion) checkoutError(error.message, () => openCheckout(productId, currentCheckoutToken));
   }

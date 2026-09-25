@@ -236,10 +236,10 @@ document.getElementById('ageExit').addEventListener('click',function(){window.lo
     </ul>
     <details class="footer-more">
       <summary>Informações</summary>
-      <nav class="footer-links" aria-label="Informações"><a href="/termos">Termos de Uso</a><span aria-hidden="true">·</span><a href="/privacidade">Privacidade</a><span aria-hidden="true">·</span><a href="/aviso-de-conteudo">Aviso de Conteúdo</a><span aria-hidden="true">·</span><a href="/contato">Contato</a></nav>
+      <nav class="footer-links" aria-label="Informações"><a href="/termos">Termos de Uso</a></nav>
       <p class="footer-fine">Conteúdo digital 18+. Este serviço pode utilizar recursos de inteligência artificial e automação.</p>
     </details>
-    <p class="footer-copy">© 2026 Maya <span aria-hidden="true">·</span> 18+ <span aria-hidden="true">·</span> <a class="footer-access" data-buyer-access href="/meu-acesso">Meu acesso</a></p>
+    <p class="footer-copy">© 2026 Maya <span aria-hidden="true">·</span> 18+ <span aria-hidden="true">·</span> <a href="/termos">Termos de Uso</a> <span aria-hidden="true">·</span> <a class="footer-access" data-buyer-access href="/meu-acesso">Meu acesso</a></p>
   </footer>
 </div><!-- end mobile-frame -->
 
@@ -259,7 +259,9 @@ document.getElementById('ageExit').addEventListener('click',function(){window.lo
         <div class="checkout-product-description"><span class="checkout-summary-label">Você selecionou</span><span class="checkout-plan-label" id="checkoutPlanLabel">1 mês</span></div>
         <span class="checkout-plan-price" id="checkoutPlanPrice">R$ 9,90</span>
       </div>
-      <p class="checkout-consent" id="checkoutConsent">Pagamento único, sem renovação automática. Ao gerar o PIX, você confirma ser maior de 18 anos e concorda com os <a href="/termos" target="_blank" rel="noopener">Termos de Uso</a> e a <a href="/privacidade" target="_blank" rel="noopener">Privacidade</a>.</p>
+      <p class="checkout-consent" id="checkoutOfferDetails"></p>
+      <p class="checkout-consent" id="checkoutConsent">Pagamento único, sem renovação automática. Ao gerar o PIX, você confirma ser maior de 18 anos e toma ciência dos <a href="/termos" target="_blank" rel="noopener">Termos de Uso</a>, que incluem a política de privacidade e de reembolso.</p>
+      <button type="button" class="btn-orange btn-pix" id="checkoutConfirmPix" hidden>CONFIRMAR E GERAR PIX</button>
 
 <!-- Loading State -->
       <div id="pixLoadingState" class="pix-loading-box" style="display: none;">
