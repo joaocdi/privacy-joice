@@ -794,11 +794,11 @@ body { background: #ecebe9; }
 .vip-feed .vip-media:not(.vip-media-missing) {
   aspect-ratio: 4 / 5;
   height: auto;
-  background: #e9e6e5;
+  background: linear-gradient(145deg, #514b4c, #292729);
 }
 .vip-feed .vip-media .car-cell {
   position: relative;
-  background: #e9e6e5;
+  background: linear-gradient(145deg, #514b4c, #292729);
 }
 .vip-feed .vip-media .car-cell > img,
 .vip-feed .vip-media .car-cell > video {
@@ -812,7 +812,7 @@ body { background: #ecebe9; }
   object-fit: contain;
   background: transparent;
 }
-.vip-feed .vip-media .car-cell > video { background: #252326; }
+.vip-feed .vip-media .car-cell > video { background: transparent; }
 .vip-feed .vip-video-play {
   top: 50%; left: 50%; transform: translate(-50%, -50%);
   width: 56px; height: 56px;
