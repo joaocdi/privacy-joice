@@ -370,6 +370,7 @@ function buildMediaPost(post, profile, priority = false) {
         cell.classList.toggle('is-landscape', video.videoWidth > video.videoHeight);
         if (Number(box.dataset.activeIndex || 0) === index) box.classList.toggle('is-landscape', video.videoWidth > video.videoHeight);
       });
+      video.addEventListener('loadeddata', () => cell.classList.add('vip-video-frame-ready'));
       video.src = API_BASE + item.media;
       if (typeof item.poster === 'string' && item.poster.startsWith('data:image/jpeg;base64,')) {
         const cover = document.createElement('img');
