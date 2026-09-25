@@ -223,6 +223,7 @@ function mountTeaser(locked, { src, seconds, poster, overlay }) {
   video.addEventListener('ended', finish);
   replay.addEventListener('click', event => { event.stopPropagation(); finished = false; play(); });
   video.addEventListener('loadeddata', () => { locked.classList.add('teaser-ready'); });
+  video.addEventListener('loadedmetadata', () => setMediaOrientation(locked, video.videoWidth, video.videoHeight));
   video.addEventListener('playing', () => { locked.classList.add('teaser-ready'); replay.hidden = true; });
   video.addEventListener('error', () => { locked.classList.remove('teaser-ready'); replay.hidden = false; });
   // Fetch the small derivative shortly before arrival, without playing offscreen.
@@ -250,6 +251,10 @@ function mountTeaser(locked, { src, seconds, poster, overlay }) {
   else locked.append(video);
   locked.append(replay);
   return video;
+}
+
+function setMediaOrientation(frame, width, height) {
+  if (width > 0 && height > 0) frame.classList.toggle('is-landscape', width > height);
 }
 
 /**
@@ -297,6 +302,7 @@ function mountLockedCarousel(locked, overlay, items, teaserSeconds) {
     image.alt = item.type === 'video' ? 'Prévia desfocada de um vídeo exclusivo' : 'Prévia desfocada de uma foto exclusiva';
     image.loading = index === 0 ? 'eager' : 'lazy';
     image.width = 64; image.height = 80;
+    image.addEventListener('load', () => setMediaOrientation(cell, image.naturalWidth, image.naturalHeight));
     cell.append(image);
     if (item.type === 'video' && typeof item.teaser === 'string' && item.teaser.startsWith('/api/home/preview-video/')) {
       cell.classList.add('has-teaser');
@@ -799,6 +805,7 @@ document.addEventListener('click', event => {
       image.loading = rendered === 0 && index === 0 ? 'eager' : 'lazy';
       image.decoding = 'async';
       image.width = 64; image.height = 80;
+      image.addEventListener('load', () => setMediaOrientation(locked, image.naturalWidth, image.naturalHeight));
       image.src = item.preview;
       const overlay = document.createElement('div');
       overlay.className = 'locked-overlay';
@@ -828,6 +835,9 @@ document.addEventListener('click', event => {
           }
           else { element.alt=item.caption || 'Publicação pública'; element.loading='lazy'; }
           element.src = API_BASE + media.publicUrl;
+          element.addEventListener(media.type === 'video' ? 'loadedmetadata' : 'load', () => {
+            setMediaOrientation(cell, media.type === 'video' ? element.videoWidth : element.naturalWidth, media.type === 'video' ? element.videoHeight : element.naturalHeight);
+          });
           cell.append(element);
           if (media.type === 'video') publicVideoObserver.observe(element);
         }));
