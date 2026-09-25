@@ -823,7 +823,8 @@ body { background: #ecebe9; }
   object-fit: cover;
   pointer-events: none;
 }
-.vip-feed .vip-media .car-cell.vip-video-playing > .vip-video-cover { display: none; }
+.vip-feed .vip-media .car-cell.vip-video-playing > .vip-video-cover,
+.vip-feed .vip-media .car-cell.vip-video-frame-ready > .vip-video-cover { display: none; }
 .vip-feed .vip-video-play {
   top: 50%; left: 50%; transform: translate(-50%, -50%);
   width: 56px; height: 56px;
