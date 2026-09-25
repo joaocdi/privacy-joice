@@ -853,6 +853,9 @@ document.addEventListener('click', event => {
               cell.classList.add('public-video-playing');
               element.controls = true;
             });
+            // Mostra o primeiro quadro real assim que decodifica, antes do play.
+            // A miniatura gravada no upload é recortada para 160x200.
+            element.addEventListener('loadeddata', () => cell.classList.add('public-video-frame-ready'));
             element.addEventListener('error', () => { play.textContent = '▶'; });
             cell.append(cover, play);
           }
