@@ -20,6 +20,43 @@ let likedPosts;
 try { likedPosts = new Set(JSON.parse(localStorage.getItem(LIKE_KEY) || '[]').map(String)); }
 catch (_) { likedPosts = new Set(); }
 let currentFeed = [];
+let feedLoadedAt = 0;
+let adminFeed = false;
+let refreshingFeed = null;
+let renewedFeed = null;
+let renewedAt = 0;
+
+// Os links das mídias são temporários. Renova somente quando alguém precisa
+// abrir uma mídia antiga, sem reconstruir os posts ou interromper outros vídeos.
+async function freshMediaUrl(post, item) {
+  if (!refreshingFeed && (!renewedFeed || Date.now() - renewedAt > 10 * 60 * 1000)) {
+    refreshingFeed = (async () => {
+      const access = adminFeed ? null : readAccess();
+      if (!adminFeed && !access) throw new Error('Acesso indisponível');
+      const url = adminFeed ? '/api/vip/preview' : `/api/vip/${encodeURIComponent(access.orderId)}`;
+      const response = await fetch(API_BASE + url, {
+        credentials: 'include',
+        headers: access ? { Authorization: 'Bearer ' + access.token } : {},
+        cache: 'no-store',
+        signal: AbortSignal.timeout(15000)
+      });
+      if (!response.ok) throw new Error('Não foi possível renovar o acesso à mídia');
+      const data = await response.json();
+      if (!data.granted || !Array.isArray(data.feed)) throw new Error('Acesso à mídia indisponível');
+      feedLoadedAt = renewedAt = Date.now();
+      renewedFeed = data.feed;
+      return data.feed;
+    })().finally(() => { refreshingFeed = null; });
+  }
+  const feed = refreshingFeed ? await refreshingFeed : renewedFeed;
+  const updated = feed.find(entry => String(entry.id) === String(post.id));
+  const media = updated?.items?.length
+    ? updated.items.find(entry => String(entry.id) === String(item.id))?.media
+    : updated?.media;
+  if (!media) throw new Error('Mídia indisponível');
+  item.media = media;
+  return API_BASE + media;
+}
 /**
  * Mídia que não abre (arquivo ainda não enviado, link expirado, erro do
  * Storage) vira um aviso curto no lugar do <img> quebrado. A moldura some:
@@ -170,6 +207,9 @@ async function adminPreview() {
 
 function render(data) {
   const profile = data.profile || {};
+  adminFeed = Boolean(data.admin);
+  feedLoadedAt = Date.now();
+  renewedFeed = null;
 
   $('vipCover').src = profile.cover || '';
   JoiceFrame.apply($('vipCover'),profile.coverCrop,{role:'cover',box:document.querySelector('.vip-cover')});
@@ -285,11 +325,8 @@ function buildMediaPost(post, profile) {
   }
   article.append(head);
 
-  // mídia (o src é um link assinado, válido por poucos minutos)
-  // TODA publicação usa a mesma moldura 4:5 e a mídia PREENCHE essa moldura
-  // (cover, no CSS). Não sobra área nenhuma para preencher: nenhum post fica
-  // com tarja preta, nenhum fica com faixa borrada de um lado enquanto o
-  // vizinho fica do outro, e todos têm exatamente o mesmo tamanho.
+  // A moldura é igual em todos os posts; a mídia fica inteira dentro dela.
+  // O recorte configurado para as prévias públicas não se aplica ao VIP.
   const box = document.createElement('div');
   box.className = 'vip-media';
 
@@ -303,7 +340,26 @@ function buildMediaPost(post, profile) {
   JoiceCarousel.build(box, items.map((item, index) => (cell) => {
     if (item.type === 'video') {
       const video = document.createElement('video');
-      video.addEventListener('error', () => mediaUnavailable(cell, { draft: post.draft }));
+      let retrying = false;
+      let retried = false;
+      async function renewVideo() {
+        if (retrying) return;
+        retrying = true;
+        try {
+          video.src = await freshMediaUrl(post, item);
+          video.load();
+          return true;
+        } catch (_) {
+          mediaUnavailable(cell, { draft: post.draft });
+          return false;
+        } finally { retrying = false; }
+      }
+      video.addEventListener('error', async () => {
+        if (retrying || !video.isConnected) return;
+        if (retried) return mediaUnavailable(cell, { draft: post.draft });
+        retried = true;
+        await renewVideo();
+      });
       video.src = API_BASE + item.media;
       video.controls = true;
       video.playsInline = true;
@@ -318,24 +374,29 @@ function buildMediaPost(post, profile) {
       playButton.className = 'vip-video-play';
       playButton.textContent = '▶';
       playButton.setAttribute('aria-label', 'Reproduzir vídeo');
-      playButton.addEventListener('click', event => {
+      playButton.addEventListener('click', async event => {
         event.stopPropagation();
+        if (Date.now() - feedLoadedAt > 10 * 60 * 1000 && !await renewVideo()) return;
         video.play().catch(() => { playButton.hidden = false; });
       });
       video.addEventListener('play', () => { playButton.hidden = true; });
       video.addEventListener('pause', () => { playButton.hidden = false; });
       video.addEventListener('ended', () => { playButton.hidden = false; });
       cell.append(playButton);
-      JoiceFrame.apply(video, item.crop, { box: cell });
     } else {
       const image = document.createElement('img');
       image.decoding = 'async';
-      image.addEventListener('error', () => mediaUnavailable(cell, { draft: post.draft }));
+      let retried = false;
+      image.addEventListener('error', async () => {
+        if (retried || !image.isConnected) return mediaUnavailable(cell, { draft: post.draft });
+        retried = true;
+        try { image.src = await freshMediaUrl(post, item); }
+        catch (_) { mediaUnavailable(cell, { draft: post.draft }); }
+      });
       image.src = API_BASE + item.media;
       image.alt = post.caption || 'Foto exclusiva da Maya';
       image.loading = index === 0 ? 'eager' : 'lazy';
       cell.append(image);
-      JoiceFrame.apply(image, item.crop, { box: cell });
     }
   }), {
     // O vídeo que entra em cena volta a poder tocar; o que sai já foi pausado.
