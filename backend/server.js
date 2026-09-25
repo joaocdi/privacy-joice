@@ -295,6 +295,7 @@ function carouselFor(post, link) {
       id: item.id || post.id,
       type: item.type,
       crop: item.crop || null,
+      poster: item.type === 'video' ? item.poster || null : null,
       position: index,
       media: link(item.id ? `${post.id}#${item.id}` : post.id)
     }));
