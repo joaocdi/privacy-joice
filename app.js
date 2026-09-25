@@ -266,6 +266,16 @@ function isSafePreviewItem(item) {
   return foto || video;
 }
 
+// Em posts públicos, a amostra do vídeo aparece de imediato; só busca os
+// bytes do arquivo quando o cartão estiver próximo da tela.
+const publicVideoObserver = new IntersectionObserver(entries => {
+  for (const entry of entries) {
+    if (!entry.isIntersecting) continue;
+    entry.target.preload = 'auto';
+    publicVideoObserver.unobserve(entry.target);
+  }
+}, { rootMargin: '450px 0px', threshold: 0 });
+
 /**
  * O carrossel bloqueado da HOME.
  *
@@ -784,12 +794,12 @@ document.addEventListener('click', event => {
       locked.className = 'locked-post';
       const image = document.createElement('img');
       image.className = 'locked-img';
-      image.src = item.preview;
       image.alt = item.type === 'video' ? 'Prévia desfocada de um vídeo exclusivo' : 'Prévia desfocada de uma foto exclusiva';
       // Só a primeira prévia da PRIMEIRA página entra como prioritária.
       image.loading = rendered === 0 && index === 0 ? 'eager' : 'lazy';
       image.decoding = 'async';
       image.width = 64; image.height = 80;
+      image.src = item.preview;
       const overlay = document.createElement('div');
       overlay.className = 'locked-overlay';
       overlay.innerHTML = overlayModel;
@@ -811,10 +821,15 @@ document.addEventListener('click', event => {
         const publicItems = item.items?.length ? item.items : [{type:item.type, publicUrl:item.publicUrl, crop:item.crop}];
         JoiceCarousel.build(locked, publicItems.filter(media => media.publicUrl?.startsWith('/api/home/public-media/')).map(media => cell => {
           const element = document.createElement(media.type === 'video' ? 'video' : 'img');
-          element.src = API_BASE + media.publicUrl;
-          if (media.type === 'video') { element.controls=true; element.playsInline=true; element.preload='metadata'; }
+          if (media.type === 'video') {
+            element.controls=true; element.playsInline=true; element.preload='none';
+            const poster = media.preview || item.preview;
+            if (typeof poster === 'string' && poster.startsWith('data:image/jpeg;base64,')) element.poster=poster;
+          }
           else { element.alt=item.caption || 'Publicação pública'; element.loading='lazy'; }
+          element.src = API_BASE + media.publicUrl;
           cell.append(element);
+          if (media.type === 'video') publicVideoObserver.observe(element);
         }));
       }
       fragment.append(header, locked);
