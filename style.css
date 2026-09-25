@@ -2069,7 +2069,7 @@ body.carregando .stats-row span { color:#dcd8d5; }
    apenas a derivada pequena; nenhum arquivo VIP sai nesta página. */
 .content-section .preview-post .locked-post,
 .content-section .preview-post .locked-post .car-cell {
-  background: linear-gradient(145deg, #514b4c, #292729);
+  background: linear-gradient(145deg, rgba(245, 230, 220, .45), rgba(255, 255, 255, .7));
 }
 .content-section .preview-post .locked-post > .locked-img,
 .content-section .preview-post .locked-post .car-cell > .locked-img,
@@ -2083,9 +2083,11 @@ body.carregando .stats-row span { color:#dcd8d5; }
   height: 100%;
   max-width: 100%;
   max-height: 100%;
-  object-fit: contain;
+  object-fit: cover;
   transform: none;
 }
+.content-section .preview-post .locked-post.is-landscape > :is(.locked-img, .locked-video),
+.content-section .preview-post .locked-post .car-cell.is-landscape > :is(.locked-img, .locked-video, img, video) { object-fit: contain; }
 .content-section .preview-post .locked-post > .locked-video,
 .content-section .preview-post .locked-post .car-cell > .locked-video { z-index: 1; }
 /* O pôster estático é reserva para antes e depois do teaser. Quando o vídeo
@@ -2094,7 +2096,7 @@ body.carregando .stats-row span { color:#dcd8d5; }
 .content-section .preview-post .locked-post .car-cell.teaser-ready > .locked-img { visibility: hidden; }
 .content-section .preview-post .locked-post.public-post,
 .content-section .preview-post .locked-post.public-post .car-cell {
-  background: linear-gradient(145deg, #514b4c, #292729);
+  background: linear-gradient(145deg, rgba(245, 230, 220, .45), rgba(255, 255, 255, .7));
 }
 .content-section .preview-post .locked-post.public-post .car-cell > video { background: transparent; }
 .content-section .preview-post .locked-post .locked-overlay { z-index: 3; }
