@@ -788,3 +788,30 @@ body { background: #ecebe9; }
 .vip-media .car-track,.vip-media .car-cell{height:100%;min-height:0}
 .vip-feed.is-grid .vip-media{aspect-ratio:1/1}
 @media(max-width:480px){.vip-post-head{padding:12px}.vip-caption{padding:12px}}
+
+/* Feed VIP: formato constante no cartão e arquivo sempre inteiro. O recorte
+   usado nas prévias não deve esconder partes de fotos ou vídeos pagos. */
+.vip-feed .vip-media:not(.vip-media-missing) {
+  aspect-ratio: 4 / 5;
+  height: auto;
+  background: #242124;
+}
+.vip-feed .vip-media .car-cell {
+  display: grid;
+  place-items: center;
+  background: radial-gradient(ellipse at center, #544c4d, #242124 72%);
+}
+.vip-feed .vip-media .car-cell > img,
+.vip-feed .vip-media .car-cell > video {
+  position: relative;
+  inset: auto;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  aspect-ratio: auto;
+  object-fit: contain;
+  background: transparent;
+}
+.vip-feed .vip-media .car-cell > video { background: #242124; }
+.vip-feed.is-grid .vip-media { aspect-ratio: 1 / 1; }
