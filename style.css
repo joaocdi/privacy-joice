@@ -2099,4 +2099,20 @@ body.carregando .stats-row span { color:#dcd8d5; }
   background: linear-gradient(145deg, rgba(245, 230, 220, .45), rgba(255, 255, 255, .7));
 }
 .content-section .preview-post .locked-post.public-post .car-cell > video { background: transparent; }
+.content-section .preview-post .locked-post.public-post .car-cell > video { z-index: 1; }
+.content-section .preview-post .locked-post.public-post .car-cell > .public-video-cover {
+  z-index: 2;
+  object-fit: cover;
+  pointer-events: none;
+}
+.public-video-play {
+  position: absolute; z-index: 3; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  min-width: 56px; height: 56px; padding: 0 12px;
+  border: 1px solid #ffffffaa; border-radius: 30px;
+  background: #1b1518b8; color: #fff;
+  font: 600 15px Poppins, Arial, sans-serif; cursor: pointer;
+}
+.public-video-playing > .public-video-cover,
+.public-video-playing > .public-video-play { display: none !important; }
 .content-section .preview-post .locked-post .locked-overlay { z-index: 3; }
