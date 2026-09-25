@@ -366,6 +366,9 @@ function buildMediaPost(post, profile, priority = false) {
         retried = true;
         await renewVideo();
       });
+      video.addEventListener('loadedmetadata', () => {
+        cell.classList.toggle('is-landscape', video.videoWidth > video.videoHeight);
+      });
       video.src = API_BASE + item.media;
       if (typeof item.poster === 'string' && item.poster.startsWith('data:image/jpeg;base64,')) video.poster = item.poster;
       video.controls = true;
@@ -406,6 +409,9 @@ function buildMediaPost(post, profile, priority = false) {
         catch (_) { mediaUnavailable(cell, { draft: post.draft }); }
       });
       image.alt = post.caption || 'Foto exclusiva da Maya';
+      image.addEventListener('load', () => {
+        cell.classList.toggle('is-landscape', image.naturalWidth > image.naturalHeight);
+      });
       image.loading = priority && index === 0 ? 'eager' : 'lazy';
       if (priority && index === 0) image.fetchPriority = 'high';
       image.src = API_BASE + item.media;
