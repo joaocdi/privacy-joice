@@ -65,7 +65,7 @@ async function freshMediaUrl(post, item) {
 function mediaUnavailable(cell, { draft }) {
   if (cell.dataset.unavailable === '1') return;
   cell.dataset.unavailable = '1';
-  cell.querySelectorAll('img, video, .vip-video-play').forEach(node => node.remove());
+  cell.querySelectorAll('img, video, canvas, .vip-video-play').forEach(node => node.remove());
   cell.classList.add('vip-media-missing');
   const aviso = document.createElement('p');
   aviso.className = 'vip-media-missing-text';
@@ -340,6 +340,30 @@ function buildMediaPost(post, profile) {
   JoiceCarousel.build(box, items.map((item, index) => (cell) => {
     if (item.type === 'video') {
       const video = document.createElement('video');
+      // Mostra nas sobras um quadro borrado do próprio vídeo, como no CapCut.
+      const backdrop = document.createElement('canvas');
+      backdrop.className = 'vip-media-backdrop';
+      backdrop.setAttribute('aria-hidden', 'true');
+      backdrop.width = 80;
+      backdrop.height = 100;
+      cell.append(backdrop);
+      const canvasContext = backdrop.getContext('2d');
+      let lastFrame = 0;
+      function paintBackdrop() {
+        if (!canvasContext || !video.videoWidth || !video.videoHeight || !video.isConnected) return;
+        if (performance.now() - lastFrame < 450) return;
+        lastFrame = performance.now();
+        try {
+          const scale = Math.max(backdrop.width / video.videoWidth, backdrop.height / video.videoHeight);
+          const width = video.videoWidth * scale;
+          const height = video.videoHeight * scale;
+          canvasContext.drawImage(video, (backdrop.width - width) / 2, (backdrop.height - height) / 2, width, height);
+          backdrop.classList.add('is-painted');
+        } catch (_) { /* O vídeo continua funcionando se o navegador bloquear a cópia do quadro. */ }
+      }
+      video.addEventListener('loadeddata', paintBackdrop);
+      video.addEventListener('seeked', paintBackdrop);
+      video.addEventListener('timeupdate', paintBackdrop);
       let retrying = false;
       let retried = false;
       async function renewVideo() {
@@ -385,12 +409,19 @@ function buildMediaPost(post, profile) {
       cell.append(playButton);
     } else {
       const image = document.createElement('img');
+      const backdrop = document.createElement('img');
+      backdrop.className = 'vip-media-backdrop is-painted';
+      backdrop.alt = '';
+      backdrop.setAttribute('aria-hidden', 'true');
+      backdrop.loading = 'lazy';
+      backdrop.src = API_BASE + item.media;
+      cell.append(backdrop);
       image.decoding = 'async';
       let retried = false;
       image.addEventListener('error', async () => {
         if (retried || !image.isConnected) return mediaUnavailable(cell, { draft: post.draft });
         retried = true;
-        try { image.src = await freshMediaUrl(post, item); }
+        try { backdrop.src = image.src = await freshMediaUrl(post, item); }
         catch (_) { mediaUnavailable(cell, { draft: post.draft }); }
       });
       image.src = API_BASE + item.media;
