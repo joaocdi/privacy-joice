@@ -326,16 +326,5 @@ document.getElementById('ageExit').addEventListener('click',function(){window.lo
 <script defer src="app.js?v=home-media-14"></script>
 <script defer src="/admin-loader.js?v=1"></script>
 
-
-<link rel="stylesheet" href="/vip.css?v=vip-media-14">
-<div id="visualqa" style="position:fixed;inset:0;z-index:9999;overflow:auto;background:#f6f4f2;padding:25px;display:flex;align-items:flex-start;justify-content:center;gap:18px;flex-wrap:wrap;font-family:Poppins,Arial,sans-serif">
-<section class="content-section" style="display:block!important;width:390px;padding:0"><article class="preview-post"><div class="post-header">Prévia no feed</div><div class="locked-post has-teaser" style="width:100%"><video class="locked-video teaser-ready" src="https://maya.ofc.bio/api/home/preview-video/post-d4226145-444e-4e19-9b8c-b878b82740e2" autoplay muted playsinline preload="auto" style="opacity:1"></video><div class="locked-overlay"><div class="lock-icon">🔒</div></div></div></article></section>
-<section class="vip-feed" style="width:390px"><article class="vip-post"><div class="vip-post-head">Mídia no VIP</div><div class="vip-media"><div class="car-cell vip-video-cell" style="position:relative;width:100%;height:100%"><video src="https://maya.ofc.bio/api/home/preview-video/post-d4226145-444e-4e19-9b8c-b878b82740e2" autoplay muted playsinline preload="auto"></video></div></div></article></section></div>
-<script>
-for(const v of document.querySelectorAll('#visualqa video')){
- const update=()=>{if(!v.videoWidth||!v.videoHeight)return;const frame=v.closest('.locked-post,.vip-media');frame.style.setProperty('--video-ratio',v.videoWidth+' / '+v.videoHeight);frame.classList.add('native-video-ratio')};
- v.addEventListener('loadedmetadata',update);if(v.readyState>=1)update();
-}
-</script>
 </body>
 </html>
