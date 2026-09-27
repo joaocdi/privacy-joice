@@ -19,6 +19,9 @@ const { initBot, getBot, stopBot } = require('./telegram/bot');
 const { kickUser } = require('./telegram/invites');
 
 const app = express();
+// A Vercel sobrescreve X-Forwarded-For com o IP do visitante. Confiar apenas
+// no último proxy evita tratar todos os compradores como o IP do gateway.
+if (process.env.VERCEL) app.set('trust proxy', 1);
 const buyerRecovery = require('./services/buyer-recovery');
 const buyerPhone = require('./services/buyer-phone');
 const buyerAccounts = require('./services/buyer-accounts');
