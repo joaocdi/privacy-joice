@@ -2087,25 +2087,21 @@ body.carregando .stats-row span { color:#dcd8d5; }
   object-fit: cover;
   transform: none;
 }
-/* Prévia de venda: a derivada preenche a moldura mesmo quando o original é
-   horizontal. Evita a tira estreita cercada por grandes faixas vazias. */
+/* O teaser derivado conserva a proporção original dentro da moldura. */
 .content-section .preview-post .locked-post > .locked-video,
-.content-section .preview-post .locked-post .car-cell > .locked-video { z-index: 1; }
-/* O pôster estático é reserva para antes e depois do teaser. Quando o vídeo
-   entra, escondê-lo evita a foto duplicada nas laterais e em cima/baixo. */
-.content-section .preview-post .locked-post.teaser-ready > .locked-img,
-.content-section .preview-post .locked-post .car-cell.teaser-ready > .locked-img { visibility: hidden; }
+.content-section .preview-post .locked-post .car-cell > .locked-video { z-index: 1; object-fit: contain; }
+/* A miniatura 4:5 é recortada: aguarde o quadro real do teaser. Só a exiba
+   quando a derivada falhar e não houver vídeo para mostrar. */
+.content-section .preview-post .locked-post.has-teaser > .locked-img,
+.content-section .preview-post .locked-post .car-cell.has-teaser > .locked-img { visibility: hidden; }
+.content-section .preview-post .locked-post.has-teaser.teaser-error > .locked-img,
+.content-section .preview-post .locked-post .car-cell.has-teaser.teaser-error > .locked-img { visibility: visible; }
 .content-section .preview-post .locked-post.public-post,
 .content-section .preview-post .locked-post.public-post .car-cell {
   background: linear-gradient(145deg, rgba(245, 230, 220, .45), rgba(255, 255, 255, .7));
 }
 .content-section .preview-post .locked-post.public-post .car-cell > video { background: transparent; }
-.content-section .preview-post .locked-post.public-post .car-cell > video { z-index: 1; }
-.content-section .preview-post .locked-post.public-post .car-cell > .public-video-cover {
-  z-index: 2;
-  object-fit: cover;
-  pointer-events: none;
-}
+.content-section .preview-post .locked-post.public-post .car-cell > video { z-index: 1; object-fit: contain; }
 .public-video-play {
   position: absolute; z-index: 3; top: 50%; left: 50%;
   transform: translate(-50%, -50%);
@@ -2114,8 +2110,6 @@ body.carregando .stats-row span { color:#dcd8d5; }
   background: #1b1518b8; color: #fff;
   font: 600 15px Poppins, Arial, sans-serif; cursor: pointer;
 }
-.public-video-playing > .public-video-cover,
-.public-video-frame-ready > .public-video-cover,
 .public-video-playing > .public-video-play { display: none !important; }
 .content-section .preview-post .locked-post .locked-overlay { z-index: 3; }
 /* O WebKit no iPhone pode dividir o filtro de blur em blocos e mostrar uma
