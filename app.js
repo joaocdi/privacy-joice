@@ -169,7 +169,7 @@ const HOME_CAPTIONS = [
  * `preload="metadata"` de propósito: no celular, nada de baixar o arquivo
  * inteiro antes da pessoa olhar para ele.
  */
-function mountTeaser(locked, { src, seconds, poster, overlay }) {
+function mountTeaser(locked, { src, seconds, overlay }) {
   // O convite do teaser fala do vídeo, não de "este conteúdo" genérico.
   if (overlay) {
     const title = overlay.querySelector('.locked-text');
@@ -194,7 +194,6 @@ function mountTeaser(locked, { src, seconds, poster, overlay }) {
   video.controls = false;
   video.disablePictureInPicture = true;
   video.setAttribute('controlsList', 'nodownload noplaybackrate noremoteplayback');
-  if (poster) video.poster = poster;
 
   const replay = document.createElement('button');
   replay.type = 'button';
@@ -211,12 +210,11 @@ function mountTeaser(locked, { src, seconds, poster, overlay }) {
     if (!video.getAttribute('src')) video.src = video.dataset.teaserSrc;
     return video.play().then(() => { replay.hidden = true; }).catch(() => { replay.hidden = false; });
   };
-  // Fim da prévia: volta ao cartão bloqueado, com o convite de rever.
+  // Ao terminar, mantém o quadro do próprio teaser atrás do convite de rever.
   const finish = () => {
     finished = true;
     video.pause();
     try { video.currentTime = 0; } catch (_) { /* alguns navegadores recusam */ }
-    locked.classList.remove('teaser-ready');
     replay.hidden = false;
   };
   video.addEventListener('timeupdate', () => { if (video.currentTime >= limit) finish(); });
@@ -225,7 +223,7 @@ function mountTeaser(locked, { src, seconds, poster, overlay }) {
   video.addEventListener('loadeddata', () => { locked.classList.add('teaser-ready'); });
   video.addEventListener('loadedmetadata', () => setMediaOrientation(locked, video.videoWidth, video.videoHeight));
   video.addEventListener('playing', () => { locked.classList.add('teaser-ready'); replay.hidden = true; });
-  video.addEventListener('error', () => { locked.classList.remove('teaser-ready'); replay.hidden = false; });
+  video.addEventListener('error', () => { locked.classList.remove('teaser-ready'); locked.classList.add('teaser-error'); replay.hidden = false; });
   // Fetch the small derivative shortly before arrival, without playing offscreen.
   const warmup = new IntersectionObserver(entries => {
     if (entries.some(entry => entry.isIntersecting)) {
@@ -336,7 +334,7 @@ function mountLockedCarousel(locked, overlay, items, teaserSeconds) {
     cell.append(image);
     if (item.type === 'video' && typeof item.teaser === 'string' && item.teaser.startsWith('/api/home/preview-video/')) {
       cell.classList.add('has-teaser');
-      const video = mountTeaser(cell, { src: API_BASE + item.teaser, seconds: teaserSeconds, poster: item.preview, overlay: null });
+      const video = mountTeaser(cell, { src: API_BASE + item.teaser, seconds: teaserSeconds, overlay: null });
     }
   }), {
     onEnter: video => { video.play?.().catch(() => {}); }
@@ -852,11 +850,10 @@ document.addEventListener('click', event => {
       overlay.className = 'locked-overlay';
       overlay.innerHTML = overlayModel;
       locked.append(image, overlay);
-      // Vídeo com teaser derivado: o <video> entra por cima do pôster, que fica
-      // atrás como primeiro quadro e como plano B se o autoplay for bloqueado.
+      // A imagem derivada fica como plano B em caso de erro no teaser.
       if (item.type === 'video' && typeof item.teaser === 'string' && item.teaser.startsWith('/api/home/preview-video/')) {
         locked.classList.add('has-teaser');
-        const video = mountTeaser(locked, { src: API_BASE + item.teaser, seconds: item.teaserSeconds, poster: item.preview, overlay });
+        const video = mountTeaser(locked, { src: API_BASE + item.teaser, seconds: item.teaserSeconds, overlay });
       }
       // Carrossel bloqueado: só entram itens que trazem a SUA derivada segura —
       // a amostra minúscula da foto ou a rota do teaser do vídeo. Item sem
@@ -873,14 +870,6 @@ document.addEventListener('click', event => {
             element.controls=false; element.playsInline=true; element.preload='none';
             element.muted = true; element.defaultMuted = true;
             element.setAttribute('muted', ''); element.setAttribute('playsinline', '');
-            const poster = media.preview || item.preview;
-            // O pôster nativo do <video> é encaixado pelo navegador antes de
-            // conhecer a proporção do arquivo. Uma imagem separada com cover
-            // já ocupa a moldura inteira, inclusive antes de apertar play.
-            const cover = document.createElement('img');
-            cover.className = 'public-video-cover';
-            cover.alt = '';
-            if (typeof poster === 'string' && poster.startsWith('data:image/jpeg;base64,')) cover.src = poster;
             const play = document.createElement('button');
             play.type = 'button';
             play.className = 'public-video-play';
@@ -896,11 +885,8 @@ document.addEventListener('click', event => {
               cell.classList.add('public-video-playing');
               element.controls = true;
             });
-            // Mostra o primeiro quadro real assim que decodifica, antes do play.
-            // A miniatura gravada no upload é recortada para 160x200.
-            element.addEventListener('loadeddata', () => cell.classList.add('public-video-frame-ready'));
             element.addEventListener('error', () => { play.textContent = '▶'; });
-            cell.append(cover, play);
+            cell.append(play);
           }
           else { element.alt=item.caption || 'Publicação pública'; element.loading='lazy'; }
           element.src = API_BASE + media.publicUrl;
