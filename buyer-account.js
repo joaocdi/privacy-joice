@@ -17,7 +17,12 @@ function formatPhone(value){
  const ddd='('+digits.slice(0,2)+') ',number=digits.slice(2);
  return ddd+(number.length>5?number.slice(0,5)+'-'+number.slice(5):number);
 }
-phoneInput.addEventListener('input',()=>{phoneInput.value=formatPhone(phoneInput.value);});
+if(phoneInput)phoneInput.addEventListener('input',event=>{
+ // Ao apagar o fechamento do DDD, não recriá-lo: permite apagar tudo.
+ const digits=phoneInput.value.replace(/\D/g,'');
+ phoneInput.value=event.inputType?.startsWith('delete')&&digits.length<=2
+  ?(digits?'('+digits:''):formatPhone(phoneInput.value);
+});
 document.querySelectorAll('.password-toggle').forEach(button=>button.addEventListener('click',()=>{
  const input=button.parentElement.querySelector('input'),show=input.type==='password';
  input.type=show?'text':'password';button.textContent=show?'Ocultar':'Mostrar';
