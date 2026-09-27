@@ -2095,7 +2095,9 @@ body.carregando .stats-row span { color:#dcd8d5; }
 .content-section .preview-post .locked-post.has-teaser > .locked-img,
 .content-section .preview-post .locked-post .car-cell.has-teaser > .locked-img {
   visibility: visible;
-  opacity: .82;
+  opacity: .72;
+  filter: blur(24px) saturate(.9) brightness(.78);
+  transform: scale(1.16);
 }
 .content-section .preview-post .locked-post.has-teaser.teaser-error > .locked-img,
 .content-section .preview-post .locked-post .car-cell.has-teaser.teaser-error > .locked-img { opacity: 1; }
@@ -2118,5 +2120,9 @@ body.carregando .stats-row span { color:#dcd8d5; }
 /* O WebKit no iPhone pode dividir o filtro de blur em blocos e mostrar uma
    linha horizontal. A miniatura entregue pelo servidor já vem desfocada. */
 @supports (-webkit-touch-callout: none) {
-  .content-section .preview-post .locked-img { filter: none; }
+  .content-section .preview-post .locked-post.has-teaser > .locked-img,
+  .content-section .preview-post .locked-post .car-cell.has-teaser > .locked-img {
+    filter: none;
+    opacity: .38;
+  }
 }
