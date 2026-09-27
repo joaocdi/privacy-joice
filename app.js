@@ -230,7 +230,7 @@ function mountTeaser(locked, { src, seconds, overlay }) {
       if (!video.getAttribute('src')) { video.preload = 'auto'; video.src = video.dataset.teaserSrc; video.load(); }
       warmup.disconnect();
     }
-  }, { rootMargin: '450px 0px' });
+  }, { rootMargin: '900px 0px' });
   warmup.observe(video);
   const resume = () => {
     if (finished) { video.pause(); return; }
@@ -280,9 +280,10 @@ const publicVideoObserver = new IntersectionObserver(entries => {
   for (const entry of entries) {
     if (!entry.isIntersecting) continue;
     entry.target.preload = 'auto';
+    entry.target.load();
     publicVideoObserver.unobserve(entry.target);
   }
-}, { rootMargin: '450px 0px', threshold: 0 });
+}, { rootMargin: '900px 0px', threshold: 0 });
 
 // Publicações gratuitas tocam sem som quando entram no campo de visão.
 // Uma única publicação visível toca; ao sair ou trocar de aba ela pausa.
