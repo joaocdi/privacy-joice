@@ -812,7 +812,6 @@ document.addEventListener('click', event => {
  * pronta do servidor como imagem minúscula — não existe caminho de mídia aqui.
  */
 (async function loadManagedPreviews() {
-  if (location.search.includes('visualqa')) return;
   await window.ageReady;
   // Feed em páginas: o visitante recebe as primeiras prévias e o resto chega
   // ao chegar perto do fim. Menos bytes e menos vídeos no primeiro desenho.
