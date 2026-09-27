@@ -1846,6 +1846,7 @@ body { background: #ecebe9; }
 .contact-chat-messages small { color:#777; font-size:10px; }
 .contact-chat form { display:flex; gap:8px; padding:12px; border-top:1px solid #eee; }
 .contact-chat input { min-width:0; flex:1; border:1px solid #e6e6e6; border-radius:24px; padding:11px; font:inherit; }
+.contact-chat input { font-size:16px; }
 .contact-chat form button { width:42px; min-height:42px; border:0; border-radius:50%; background:#ffc299; color:#333; cursor:pointer; }
 .contact-unlock { position:relative; width:min(400px,calc(100vw - 28px)); padding:28px 22px 18px; border-radius:22px; background:white; text-align:center; font-family:Poppins,Arial,sans-serif; color:#293142; }
 .contact-unlock-close { position:absolute; right:10px; top:8px; border:0; background:none; font-size:25px; width:36px; height:36px; cursor:pointer; }
