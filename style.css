@@ -2090,17 +2090,15 @@ body.carregando .stats-row span { color:#dcd8d5; }
 /* O teaser derivado conserva a proporção original dentro da moldura. */
 .content-section .preview-post .locked-post > .locked-video,
 .content-section .preview-post .locked-post .car-cell > .locked-video { z-index: 1; object-fit: contain; }
-/* A miniatura desfocada preenche apenas as sobras da moldura; o teaser real,
-   acima dela, continua inteiro e sem zoom. */
-.content-section .preview-post .locked-post.has-teaser > .locked-img,
-.content-section .preview-post .locked-post .car-cell.has-teaser > .locked-img {
-  visibility: visible;
-  opacity: .72;
-  filter: blur(24px) saturate(.9) brightness(.78);
-  transform: scale(1.16);
+/* O cartão de vídeo toma a proporção do próprio arquivo quando os metadados
+   chegam. Assim não há faixas nem uma capa antiga ampliada nas bordas. */
+.content-section:not(.media-grid) .preview-post .locked-post.native-video-ratio {
+  aspect-ratio: var(--video-ratio) !important;
+  background: #1b1718;
 }
-.content-section .preview-post .locked-post.has-teaser.teaser-error > .locked-img,
-.content-section .preview-post .locked-post .car-cell.has-teaser.teaser-error > .locked-img { opacity: 1; }
+.content-section:not(.media-grid) .preview-post .locked-post.native-video-ratio .car-cell {
+  aspect-ratio: auto !important;
+}
 .content-section .preview-post .locked-post.public-post,
 .content-section .preview-post .locked-post.public-post .car-cell {
   background: linear-gradient(145deg, rgba(245, 230, 220, .45), rgba(255, 255, 255, .7));
@@ -2117,12 +2115,3 @@ body.carregando .stats-row span { color:#dcd8d5; }
 }
 .public-video-playing > .public-video-play { display: none !important; }
 .content-section .preview-post .locked-post .locked-overlay { z-index: 3; }
-/* O WebKit no iPhone pode dividir o filtro de blur em blocos e mostrar uma
-   linha horizontal. A miniatura entregue pelo servidor já vem desfocada. */
-@supports (-webkit-touch-callout: none) {
-  .content-section .preview-post .locked-post.has-teaser > .locked-img,
-  .content-section .preview-post .locked-post .car-cell.has-teaser > .locked-img {
-    filter: none;
-    opacity: .38;
-  }
-}
