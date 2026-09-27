@@ -2090,12 +2090,17 @@ body.carregando .stats-row span { color:#dcd8d5; }
 /* O teaser derivado conserva a proporção original dentro da moldura. */
 .content-section .preview-post .locked-post > .locked-video,
 .content-section .preview-post .locked-post .car-cell > .locked-video { z-index: 1; object-fit: contain; }
-/* A miniatura 4:5 é recortada: aguarde o quadro real do teaser. Só a exiba
-   quando a derivada falhar e não houver vídeo para mostrar. */
+/* A miniatura desfocada preenche apenas as sobras da moldura; o teaser real,
+   acima dela, continua inteiro e sem zoom. */
 .content-section .preview-post .locked-post.has-teaser > .locked-img,
-.content-section .preview-post .locked-post .car-cell.has-teaser > .locked-img { visibility: hidden; }
+.content-section .preview-post .locked-post .car-cell.has-teaser > .locked-img {
+  visibility: visible;
+  opacity: .72;
+  filter: blur(24px) saturate(.9) brightness(.78);
+  transform: scale(1.16);
+}
 .content-section .preview-post .locked-post.has-teaser.teaser-error > .locked-img,
-.content-section .preview-post .locked-post .car-cell.has-teaser.teaser-error > .locked-img { visibility: visible; }
+.content-section .preview-post .locked-post .car-cell.has-teaser.teaser-error > .locked-img { opacity: 1; }
 .content-section .preview-post .locked-post.public-post,
 .content-section .preview-post .locked-post.public-post .car-cell {
   background: linear-gradient(145deg, rgba(245, 230, 220, .45), rgba(255, 255, 255, .7));
@@ -2115,5 +2120,9 @@ body.carregando .stats-row span { color:#dcd8d5; }
 /* O WebKit no iPhone pode dividir o filtro de blur em blocos e mostrar uma
    linha horizontal. A miniatura entregue pelo servidor já vem desfocada. */
 @supports (-webkit-touch-callout: none) {
-  .content-section .preview-post .locked-img { filter: none; }
+  .content-section .preview-post .locked-post.has-teaser > .locked-img,
+  .content-section .preview-post .locked-post .car-cell.has-teaser > .locked-img {
+    filter: none;
+    opacity: .38;
+  }
 }
