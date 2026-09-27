@@ -32,10 +32,10 @@ document.querySelectorAll('.password-toggle').forEach(button=>button.addEventLis
 field('phone',false);field('confirm',false);
 (async()=>{
  $('links').replaceChildren();
- const catalog=await fetch('/api/catalog').then(r=>r.json());
+ const catalog=await fetch('/api/catalog',{signal:AbortSignal.timeout(15000)}).then(r=>r.json());
  if(!catalog.accountFlow)throw Error('Cadastro de comprador ainda não habilitado neste ambiente.');
  if(path==='/meu-acesso'){
-  const r=await fetch('/api/buyer/account');if(r.status===401)return location.replace('/login');const data=await r.json();
+  const r=await fetch('/api/buyer/account',{signal:AbortSignal.timeout(15000)});if(r.status===401)return location.replace('/login');if(!r.ok)throw Error('Não foi possível consultar sua compra.');const data=await r.json();
   $('title').textContent='Seu acesso, sempre aqui';$('intro').textContent=data.email;
   if(!data.orders?.length)$('message').textContent='Você ainda não tem compras vinculadas. Abra seu checkout pago para concluir o vínculo.';
   for(const order of data.orders||[]){const card=document.createElement('article');card.className='order';const title=document.createElement('h2');title.textContent=catalog.products.find(p=>p.id===order.product_id)?.name||order.product_id;const desc=document.createElement('p');const active=order.status==='ACTIVE'&&(!order.expires_at||Date.parse(order.expires_at.replace(' ','T')+'Z')>Date.now());desc.textContent=!active?'Acesso encerrado':order.expires_at?'Acesso até '+new Date(order.expires_at.replace(' ','T')+'Z').toLocaleDateString('pt-BR'):'Seu contato, disponível sempre';card.append(title,desc);if(active){const btn=document.createElement('button');btn.textContent=order.grant_type==='contact'?'Abrir meu WhatsApp':'Entrar no VIP';btn.onclick=async()=>{if(order.grant_type!=='contact')return location.assign('/vip');try{const r=await fetch('/api/contact/'+order.public_id);const d=await r.json();if(!r.ok)throw Error(d.error);location.assign(d.whatsapp);}catch(e){$('message').textContent=e.message;}};card.append(btn);}$('orders').append(card);}
@@ -56,7 +56,17 @@ field('phone',false);field('confirm',false);
   if(!recoveryToken)throw Error('Abra o link de recuperação enviado ao seu e-mail.');
   form('Sua nova senha','Escolha uma senha com pelo menos 8 caracteres.','Salvar nova senha');field('email',false);field('confirm',true);$('passwordLabel').querySelector('input').autocomplete='new-password';
  }else{form('Entrar','Acesse sua conta para ver seu conteúdo.','Entrar');link('Esqueci minha senha','/esqueci-senha');}
-})().catch(e=>{$('intro').textContent='';$('message').textContent=e.message;link('Voltar ao perfil','/');link('Entrar na minha conta','/login');});
+})().catch(e=>{
+ if(path==='/meu-acesso'){
+  $('title').textContent='Não foi possível carregar seu acesso';
+  $('intro').textContent='Sua compra continua registrada. Tente carregar a página novamente.';
+  $('message').textContent=e.name==='TimeoutError'?'A conexão demorou mais que o esperado.':e.message;
+  link('Tentar novamente',location.pathname+location.search);
+ }else{
+  $('intro').textContent='';$('message').textContent=e.message;
+  link('Voltar ao perfil','/');link('Entrar na minha conta','/login');
+ }
+});
 $('accountForm').onsubmit=async e=>{
  e.preventDefault();$('submit').disabled=true;$('message').textContent='Só um instante…';const body=Object.fromEntries(new FormData(e.target));
  try{
