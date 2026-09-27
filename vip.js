@@ -378,8 +378,16 @@ function buildMediaPost(post, profile, priority = false) {
         if (Number(box.dataset.activeIndex || 0) === index) box.classList.toggle('is-landscape', video.videoWidth > video.videoHeight);
       });
       video.src = API_BASE + item.media;
-      // A prévia pública é desfocada e pode ter outro recorte. No VIP, o
-      // primeiro quadro vem do próprio vídeo, com seu enquadramento real.
+      // A miniatura desfocada preenche só as bordas. O vídeo original fica
+      // na frente, inteiro e com seu enquadramento real.
+      if (typeof item.poster === 'string' && item.poster.startsWith('data:image/jpeg;base64,')) {
+        const backdrop = document.createElement('img');
+        backdrop.className = 'vip-video-backdrop';
+        backdrop.src = item.poster;
+        backdrop.alt = '';
+        backdrop.setAttribute('aria-hidden', 'true');
+        cell.append(backdrop);
+      }
       video.controls = true;
       video.playsInline = true;
       // O observador busca o primeiro quadro ao se aproximar do cartão.
