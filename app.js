@@ -221,7 +221,15 @@ function mountTeaser(locked, { src, seconds, overlay }) {
   video.addEventListener('ended', finish);
   replay.addEventListener('click', event => { event.stopPropagation(); finished = false; play(); });
   video.addEventListener('loadeddata', () => { locked.classList.add('teaser-ready'); });
-  video.addEventListener('loadedmetadata', () => setMediaOrientation(locked, video.videoWidth, video.videoHeight));
+  video.addEventListener('loadedmetadata', () => {
+    setMediaOrientation(locked, video.videoWidth, video.videoHeight);
+    const frame = locked.closest('.locked-post') || locked;
+    const active = !locked.matches('.car-cell') || Number(frame.dataset.activeIndex || 0) === Number(locked.dataset.index);
+    if (active && video.videoWidth && video.videoHeight) {
+      frame.style.setProperty('--video-ratio', `${video.videoWidth} / ${video.videoHeight}`);
+      frame.classList.add('native-video-ratio');
+    }
+  });
   video.addEventListener('playing', () => { locked.classList.add('teaser-ready'); replay.hidden = true; });
   video.addEventListener('error', () => { locked.classList.remove('teaser-ready'); locked.classList.add('teaser-error'); replay.hidden = false; });
   // Fetch the small derivative shortly before arrival, without playing offscreen.
@@ -325,20 +333,28 @@ function mountLockedCarousel(locked, overlay, items, teaserSeconds) {
 
   JoiceCarousel.build(locked, items.map((item, index) => (cell) => {
     cell.classList.add('locked-cell');
-    const image = document.createElement('img');
-    image.className = 'locked-img';
-    image.src = item.preview || '';
-    image.alt = item.type === 'video' ? 'Prévia desfocada de um vídeo exclusivo' : 'Prévia desfocada de uma foto exclusiva';
-    image.loading = index === 0 ? 'eager' : 'lazy';
-    image.width = 64; image.height = 80;
-    image.addEventListener('load', () => setMediaOrientation(cell, image.naturalWidth, image.naturalHeight));
-    cell.append(image);
     if (item.type === 'video' && typeof item.teaser === 'string' && item.teaser.startsWith('/api/home/preview-video/')) {
       cell.classList.add('has-teaser');
-      const video = mountTeaser(cell, { src: API_BASE + item.teaser, seconds: teaserSeconds, overlay: null });
+      mountTeaser(cell, { src: API_BASE + item.teaser, seconds: teaserSeconds, overlay: null });
+    } else {
+      const image = document.createElement('img');
+      image.className = 'locked-img';
+      image.src = item.preview || '';
+      image.alt = 'Prévia desfocada de uma foto exclusiva';
+      image.loading = index === 0 ? 'eager' : 'lazy';
+      image.width = 64; image.height = 80;
+      image.addEventListener('load', () => setMediaOrientation(cell, image.naturalWidth, image.naturalHeight));
+      cell.append(image);
     }
   }), {
-    onEnter: video => { video.play?.().catch(() => {}); }
+    onEnter: video => { video.play?.().catch(() => {}); },
+    onChange: index => {
+      locked.dataset.activeIndex = String(index);
+      const video = locked.querySelector(`.car-cell[data-index="${index}"] video`);
+      const ready = video?.videoWidth && video?.videoHeight;
+      locked.classList.toggle('native-video-ratio', Boolean(ready));
+      if (ready) locked.style.setProperty('--video-ratio', `${video.videoWidth} / ${video.videoHeight}`);
+    }
   });
   // O véu e o CTA ficam por cima de todos os slides, não dentro de um deles.
   locked.append(overlay);
@@ -838,23 +854,23 @@ document.addEventListener('click', event => {
       header.querySelector('.post-type')?.remove();
       const locked = document.createElement('div');
       locked.className = 'locked-post';
-      const image = document.createElement('img');
-      image.className = 'locked-img';
-      image.alt = item.type === 'video' ? 'Prévia desfocada de um vídeo exclusivo' : 'Prévia desfocada de uma foto exclusiva';
-      // Só a primeira prévia da PRIMEIRA página entra como prioritária.
-      image.loading = rendered === 0 && index === 0 ? 'eager' : 'lazy';
-      image.decoding = 'async';
-      image.width = 64; image.height = 80;
-      image.addEventListener('load', () => setMediaOrientation(locked, image.naturalWidth, image.naturalHeight));
-      image.src = item.preview;
       const overlay = document.createElement('div');
       overlay.className = 'locked-overlay';
       overlay.innerHTML = overlayModel;
-      locked.append(image, overlay);
-      // A imagem derivada fica como plano B em caso de erro no teaser.
+      locked.append(overlay);
       if (item.type === 'video' && typeof item.teaser === 'string' && item.teaser.startsWith('/api/home/preview-video/')) {
         locked.classList.add('has-teaser');
-        const video = mountTeaser(locked, { src: API_BASE + item.teaser, seconds: item.teaserSeconds, overlay });
+        mountTeaser(locked, { src: API_BASE + item.teaser, seconds: item.teaserSeconds, overlay });
+      } else if (!item.publicMedia) {
+        const image = document.createElement('img');
+        image.className = 'locked-img';
+        image.alt = 'Prévia desfocada de uma foto exclusiva';
+        image.loading = rendered === 0 && index === 0 ? 'eager' : 'lazy';
+        image.decoding = 'async';
+        image.width = 64; image.height = 80;
+        image.addEventListener('load', () => setMediaOrientation(locked, image.naturalWidth, image.naturalHeight));
+        image.src = item.preview;
+        locked.insertBefore(image, overlay);
       }
       // Carrossel bloqueado: só entram itens que trazem a SUA derivada segura —
       // a amostra minúscula da foto ou a rota do teaser do vídeo. Item sem
@@ -893,6 +909,10 @@ document.addEventListener('click', event => {
           element.src = API_BASE + media.publicUrl;
           element.addEventListener(media.type === 'video' ? 'loadedmetadata' : 'load', () => {
             setMediaOrientation(cell, media.type === 'video' ? element.videoWidth : element.naturalWidth, media.type === 'video' ? element.videoHeight : element.naturalHeight);
+            if (media.type === 'video' && element.videoWidth && element.videoHeight && Number(locked.dataset.activeIndex || 0) === Number(cell.dataset.index)) {
+              locked.style.setProperty('--video-ratio', `${element.videoWidth} / ${element.videoHeight}`);
+              locked.classList.add('native-video-ratio');
+            }
           });
           cell.append(element);
           if (media.type === 'video') {
@@ -900,7 +920,15 @@ document.addEventListener('click', event => {
             publicVideoObserver.observe(element);
             publicVideoAutoplayObserver.observe(element);
           }
-        }));
+        }), {
+          onChange: index => {
+            locked.dataset.activeIndex = String(index);
+            const video = locked.querySelector(`.car-cell[data-index="${index}"] video`);
+            const ready = video?.videoWidth && video?.videoHeight;
+            locked.classList.toggle('native-video-ratio', Boolean(ready));
+            if (ready) locked.style.setProperty('--video-ratio', `${video.videoWidth} / ${video.videoHeight}`);
+          }
+        });
       }
       fragment.append(header, locked);
       usados.push({ item, locked });
