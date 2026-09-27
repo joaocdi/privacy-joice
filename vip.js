@@ -75,13 +75,19 @@ function mediaUnavailable(cell, { draft }) {
 
 const vipVideoObserver = new IntersectionObserver(entries => {
   for (const entry of entries) {
-    if (entry.isIntersecting && entry.target.preload !== 'auto') entry.target.preload = 'metadata';
-    else if (!entry.target.paused) entry.target.pause();
+    if (entry.isIntersecting && entry.target.preload !== 'auto') {
+      // Busca também o primeiro quadro antes de o cartão entrar na tela.
+      entry.target.preload = 'auto';
+      entry.target.load();
+    } else if (!entry.isIntersecting && !entry.target.paused) entry.target.pause();
   }
-}, { rootMargin: '450px 0px', threshold: 0 });
+}, { rootMargin: '900px 0px', threshold: 0 });
 const vipVisibleVideoObserver = new IntersectionObserver(entries => {
   for (const entry of entries) {
-    if (entry.isIntersecting) entry.target.preload = 'auto';
+    if (entry.isIntersecting && entry.target.preload !== 'auto') {
+      entry.target.preload = 'auto';
+      entry.target.load();
+    }
   }
 }, { threshold: 0.01 });
 let currentProfile = {};
@@ -345,6 +351,7 @@ function buildMediaPost(post, profile, priority = false) {
 
   JoiceCarousel.build(box, items.map((item, index) => (cell) => {
     if (item.type === 'video') {
+      cell.classList.add('vip-video-cell');
       const video = document.createElement('video');
       let retrying = false;
       let retried = false;
@@ -375,7 +382,7 @@ function buildMediaPost(post, profile, priority = false) {
       // primeiro quadro vem do próprio vídeo, com seu enquadramento real.
       video.controls = true;
       video.playsInline = true;
-      // Só o primeiro pede metadados; os outros só quando chegam perto.
+      // O observador busca o primeiro quadro ao se aproximar do cartão.
       video.preload = 'none';
       vipVideoObserver.observe(video);
       vipVisibleVideoObserver.observe(video);
