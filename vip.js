@@ -375,19 +375,14 @@ function buildMediaPost(post, profile, priority = false) {
       });
       video.addEventListener('loadedmetadata', () => {
         cell.classList.toggle('is-landscape', video.videoWidth > video.videoHeight);
-        if (Number(box.dataset.activeIndex || 0) === index) box.classList.toggle('is-landscape', video.videoWidth > video.videoHeight);
+        if (Number(box.dataset.activeIndex || 0) === index && video.videoWidth && video.videoHeight) {
+          box.classList.toggle('is-landscape', video.videoWidth > video.videoHeight);
+          box.style.setProperty('--video-ratio', `${video.videoWidth} / ${video.videoHeight}`);
+          box.classList.add('native-video-ratio');
+        }
       });
       video.src = API_BASE + item.media;
-      // A miniatura desfocada preenche só as bordas. O vídeo original fica
-      // na frente, inteiro e com seu enquadramento real.
-      if (typeof item.poster === 'string' && item.poster.startsWith('data:image/jpeg;base64,')) {
-        const backdrop = document.createElement('img');
-        backdrop.className = 'vip-video-backdrop';
-        backdrop.src = item.poster;
-        backdrop.alt = '';
-        backdrop.setAttribute('aria-hidden', 'true');
-        cell.append(backdrop);
-      }
+      // O próprio vídeo define o formato do cartão: nenhuma miniatura recortada.
       video.controls = true;
       video.playsInline = true;
       // O observador busca o primeiro quadro ao se aproximar do cartão.
@@ -438,7 +433,12 @@ function buildMediaPost(post, profile, priority = false) {
   }), {
     onChange: index => {
       box.dataset.activeIndex = String(index);
-      box.classList.toggle('is-landscape', !!box.querySelector(`.car-cell[data-index="${index}"].is-landscape`));
+      const cell = box.querySelector(`.car-cell[data-index="${index}"]`);
+      const video = cell?.querySelector('video');
+      const ready = video?.videoWidth && video?.videoHeight;
+      box.classList.toggle('is-landscape', !!cell?.classList.contains('is-landscape'));
+      box.classList.toggle('native-video-ratio', Boolean(ready));
+      if (ready) box.style.setProperty('--video-ratio', `${video.videoWidth} / ${video.videoHeight}`);
     },
     // O vídeo que entra em cena volta a poder tocar; o que sai já foi pausado.
     onEnter: video => {
