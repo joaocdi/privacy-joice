@@ -824,8 +824,13 @@ body { background: #ecebe9; }
 .vip-feed .vip-media .car-cell > .vip-video-backdrop {
   z-index: 0;
   object-fit: cover;
-  opacity: .82;
+  opacity: .72;
+  filter: blur(24px) saturate(.9) brightness(.78);
+  transform: scale(1.16);
   pointer-events: none;
+}
+@supports (-webkit-touch-callout: none) {
+  .vip-feed .vip-media .car-cell > .vip-video-backdrop { filter: none; opacity: .38; }
 }
 .vip-feed .vip-video-play {
   top: 50%; left: 50%; transform: translate(-50%, -50%);
