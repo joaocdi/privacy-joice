@@ -58,19 +58,21 @@ async function createOrder(product, checkoutToken, provider, client = null, buye
 }
 async function getOrderByPublicId(id) { return (await getDb()).get('SELECT * FROM orders WHERE public_id = ?', id); }
 async function updateOrderPayment(id, payment) {
-  const result = await (await getDb()).run("UPDATE orders SET status='PENDING', creation_phase='complete', provider_payment_id=?, pix_copy_paste=?, pix_qr_code=?, webhook_token_hash=? WHERE public_id=? AND (status='CREATING' OR (status='FAILED' AND creation_phase='uncertain'))",
-    payment.providerPaymentId, payment.pix.copyPaste, payment.pix.qrCode, payment.webhookToken ? hash(payment.webhookToken) : null, id);
-  if (!result.changes) throw new Error('Payment persistence rejected');
-  if(payment.expiresAt){const ms=Date.parse(payment.expiresAt);if(Number.isFinite(ms)&&ms>Date.now())await (await getDb()).run('UPDATE orders SET expires_at=? WHERE public_id=?',new Date(ms).toISOString().slice(0,19).replace('T',' '),id);}
+  return transaction(async db=>{
+    const result = await db.run("UPDATE orders SET status='PENDING', creation_phase='complete', provider_payment_id=?, pix_copy_paste=?, pix_qr_code=?, webhook_token_hash=? WHERE public_id=? AND (status='CREATING' OR (status='FAILED' AND creation_phase='uncertain'))",
+      payment.providerPaymentId, payment.pix.copyPaste, payment.pix.qrCode, payment.webhookToken ? hash(payment.webhookToken) : null, id);
+    if (!result.changes) throw new Error('Payment persistence rejected');
+    if(payment.expiresAt){const ms=Date.parse(payment.expiresAt);if(Number.isFinite(ms)&&ms>Date.now())await db.run('UPDATE orders SET expires_at=? WHERE public_id=?',new Date(ms).toISOString().slice(0,19).replace('T',' '),id);}
+  });
 }
 // Claim before contacting the provider. A competing request may read the order,
 // but only this atomic transition authorizes an outbound cash-in request.
 async function beginPaymentCreation(id) {
-  const result = await (await getDb()).run("UPDATE orders SET status='CREATING',creation_phase='requested',creation_started_at=? WHERE public_id=? AND provider_payment_id IS NULL AND pix_copy_paste IS NULL AND ((status='CREATING' AND creation_phase='ready') OR (status='FAILED' AND creation_phase='retryable'))", Date.now(), id);
+  const result = await transaction(db=>db.run("UPDATE orders SET status='CREATING',creation_phase='requested',creation_started_at=? WHERE public_id=? AND provider_payment_id IS NULL AND pix_copy_paste IS NULL AND ((status='CREATING' AND creation_phase='ready') OR (status='FAILED' AND creation_phase='retryable'))", Date.now(), id));
   return Boolean(result.changes);
 }
 async function failPaymentCreation(id, safeToRetry) {
-  await (await getDb()).run("UPDATE orders SET status='FAILED',creation_phase=? WHERE public_id=? AND status='CREATING' AND creation_phase='requested'", safeToRetry ? 'retryable' : 'uncertain', id);
+  await transaction(db=>db.run("UPDATE orders SET status='FAILED',creation_phase=? WHERE public_id=? AND status='CREATING' AND creation_phase='requested'", safeToRetry ? 'retryable' : 'uncertain', id));
 }
 const CREATION_TIMEOUT_MS = 120000;
 async function recoverCreation(order) {
@@ -79,7 +81,7 @@ async function recoverCreation(order) {
     ? Date.parse(String(order.created_at).replace(' ', 'T') + 'Z') : Number(order.creation_started_at);
   if (!Number.isFinite(started) || Date.now() - started < CREATION_TIMEOUT_MS) return order;
   // A timeout does not prove cash-in failed. Never replay an ambiguous request.
-  await (await getDb()).run("UPDATE orders SET status='FAILED',creation_phase='uncertain' WHERE public_id=? AND status='CREATING' AND creation_phase=? AND COALESCE(creation_started_at,0)=?", order.public_id, order.creation_phase, Number(order.creation_started_at) || 0);
+  await transaction(db=>db.run("UPDATE orders SET status='FAILED',creation_phase='uncertain' WHERE public_id=? AND status='CREATING' AND creation_phase=? AND COALESCE(creation_started_at,0)=?", order.public_id, order.creation_phase, Number(order.creation_started_at) || 0));
   return getOrderByPublicId(order.public_id);
 }
 async function updateOrderStatus(id, status) {
