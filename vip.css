@@ -821,6 +821,17 @@ body { background: #ecebe9; }
 .vip-feed .vip-media .car-cell > video { object-fit: contain; }
 .vip-feed.is-grid .vip-media .car-cell.is-landscape > video { object-fit: contain; }
 .vip-feed .vip-media .car-cell.vip-video-cell { background: #242124; }
+.vip-feed .vip-media .car-cell > .vip-video-backdrop {
+  z-index: 0;
+  object-fit: cover;
+  opacity: .72;
+  filter: blur(24px) saturate(.9) brightness(.78);
+  transform: scale(1.16);
+  pointer-events: none;
+}
+@supports (-webkit-touch-callout: none) {
+  .vip-feed .vip-media .car-cell > .vip-video-backdrop { filter: none; opacity: .38; }
+}
 .vip-feed .vip-video-play {
   top: 50%; left: 50%; transform: translate(-50%, -50%);
   width: 56px; height: 56px;
