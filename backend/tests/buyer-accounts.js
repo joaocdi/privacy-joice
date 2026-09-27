@@ -33,6 +33,12 @@ const {app}=require('../server'),database=require('../db/database'),{confirmPaym
  assert.equal((await db.get('SELECT COUNT(*) n FROM entitlements')).n,4);
  assert.equal((await req('/api/admin/me',null,cookie)).data.admin,false);
  const evil=await fetch(base+'/api/buyer/account/logout',{method:'POST',headers:{Origin:'https://evil.invalid','Content-Type':'application/json',Cookie:cookie},body:'{}'});assert.equal(evil.status,403);
+ const configured=process.env.PUBLIC_APP_URL;
+ process.env.PUBLIC_APP_URL='https://preview.example.test';
+ const canonicalReq={get:name=>name==='origin'?'https://maya.ofc.bio':'same-origin'};
+ assert.doesNotThrow(()=>require('../services/buyer-accounts').origin(canonicalReq));
+ assert.throws(()=>require('../services/buyer-accounts').origin({get:name=>name==='origin'?'https://evil.invalid':'cross-site'}),/Origem inválida/);
+ process.env.PUBLIC_APP_URL=configured;
  identity='buyer1';
  const login=await req('/api/buyer/account/login',{email:'buyer1@example.test',password:'test-password'});assert.equal(login.status,200);
  assert.equal((await req('/api/buyer/account/recover',{email:'buyer1@example.test'})).status,200);
