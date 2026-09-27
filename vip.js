@@ -370,15 +370,9 @@ function buildMediaPost(post, profile, priority = false) {
         cell.classList.toggle('is-landscape', video.videoWidth > video.videoHeight);
         if (Number(box.dataset.activeIndex || 0) === index) box.classList.toggle('is-landscape', video.videoWidth > video.videoHeight);
       });
-      video.addEventListener('loadeddata', () => cell.classList.add('vip-video-frame-ready'));
       video.src = API_BASE + item.media;
-      if (typeof item.poster === 'string' && item.poster.startsWith('data:image/jpeg;base64,')) {
-        const cover = document.createElement('img');
-        cover.className = 'vip-video-cover';
-        cover.src = item.poster;
-        cover.alt = '';
-        cell.append(cover);
-      }
+      // A prévia pública é desfocada e pode ter outro recorte. No VIP, o
+      // primeiro quadro vem do próprio vídeo, com seu enquadramento real.
       video.controls = true;
       video.playsInline = true;
       // Só o primeiro pede metadados; os outros só quando chegam perto.
@@ -438,13 +432,13 @@ function buildMediaPost(post, profile, priority = false) {
     }
   });
 
-  article.append(box);
   if (post.caption) {
     const caption = document.createElement('p');
     caption.className = 'vip-caption';
     const author = document.createElement('strong'); author.textContent = profile.name + ' ';
     caption.append(author, document.createTextNode(post.caption)); article.append(caption);
   }
+  article.append(box);
   article.append(buildActions(post));
   return article;
 }
