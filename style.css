@@ -2118,3 +2118,8 @@ body.carregando .stats-row span { color:#dcd8d5; }
 .public-video-frame-ready > .public-video-cover,
 .public-video-playing > .public-video-play { display: none !important; }
 .content-section .preview-post .locked-post .locked-overlay { z-index: 3; }
+/* O WebKit no iPhone pode dividir o filtro de blur em blocos e mostrar uma
+   linha horizontal. A miniatura entregue pelo servidor já vem desfocada. */
+@supports (-webkit-touch-callout: none) {
+  .content-section .preview-post .locked-img { filter: none; }
+}
