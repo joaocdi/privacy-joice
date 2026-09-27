@@ -8,6 +8,22 @@ function link(text,url){const a=document.createElement('a');a.href=url;a.textCon
 async function post(route,body){const r=await fetch('/api/buyer/account/'+route,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const d=await r.json();if(!r.ok)throw Error(d.error||'Não foi possível continuar.');return d;}
 function field(name,visible,required=visible){if(!$(name+'Label'))return;$(name+'Label').hidden=!visible;const input=$(name+'Label').querySelector('input');input.disabled=!visible;input.required=required;}
 function form(title,intro,button){$('title').textContent=title;$('intro').textContent=intro;$('submit').textContent=button;$('accountForm').hidden=false;}
+const phoneInput=document.querySelector('[name="phone"]');
+function formatPhone(value){
+ let digits=value.replace(/\D/g,'');
+ if(digits.length>11&&digits.startsWith('55'))digits=digits.slice(2);
+ digits=digits.slice(0,11);
+ if(digits.length<=2)return digits.length===2?'('+digits+') ':digits?'('+digits:'';
+ const ddd='('+digits.slice(0,2)+') ',number=digits.slice(2);
+ return ddd+(number.length>5?number.slice(0,5)+'-'+number.slice(5):number);
+}
+phoneInput.addEventListener('input',()=>{phoneInput.value=formatPhone(phoneInput.value);});
+document.querySelectorAll('.password-toggle').forEach(button=>button.addEventListener('click',()=>{
+ const input=button.parentElement.querySelector('input'),show=input.type==='password';
+ input.type=show?'text':'password';button.textContent=show?'Ocultar':'Mostrar';
+ button.setAttribute('aria-pressed',String(show));
+ button.setAttribute('aria-label',(show?'Ocultar':'Mostrar')+(input.name==='password'?' senha':' confirmação da senha'));
+}));
 field('phone',false);field('confirm',false);
 (async()=>{
  $('links').replaceChildren();
