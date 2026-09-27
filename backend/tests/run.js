@@ -34,6 +34,7 @@ function child(file, env) {
 }
 async function main() {
   await child('tests/buyer-account-page.js');
+  await child('tests/proxy-rate-limit.js');
   await initDb();
   server = app.listen(0, '127.0.0.1');
   await new Promise(resolve => server.once('listening', resolve));
