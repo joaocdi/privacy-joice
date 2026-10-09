@@ -572,18 +572,6 @@ function verifiedBadge() {
 
 /* --------------------------------------------------------------- modal */
 
-$('vipChat')?.addEventListener('click', async () => {
-  const button=$('vipChat');button.disabled=true;
-  try {
-    const response=await fetch('/api/buyer/account');const account=await response.json();
-    const owned=account.orders?.find(o=>o.grant_type==='contact'&&o.status==='ACTIVE');
-    if(!owned)return location.assign('/?buy=whatsapp_unlock');
-    const result=await fetch('/api/contact/'+encodeURIComponent(owned.public_id));const contact=await result.json();
-    if(!result.ok||!contact.whatsapp)throw Error('Não foi possível abrir seu WhatsApp.');
-    location.assign(contact.whatsapp);
-  }catch(_){location.assign('/meu-acesso');}finally{button.disabled=false;}
-});
-
 // Duas abas: a lista de publicações e a grade de mídias. Sem filtro de
 // foto/vídeo — o feed mostra tudo junto, como na página inicial.
 for (const [button, grid] of [[$('vipTabPosts'), false], [$('vipTabMedia'), true]]) {

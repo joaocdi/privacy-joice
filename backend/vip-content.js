@@ -24,7 +24,7 @@
 
 // Default profile until /admin → Perfil is saved. Shared by HOME and VIP.
 const profile = {
-  name: 'Maya',
+  name: 'Joice',
   username: '@_maya.vl',
   verified: true,
   // Localização exibida no perfil (com o pino, abaixo da bio).
@@ -32,7 +32,7 @@ const profile = {
   avatar: '/nina-avatar.svg',
   cover: '/nina-cover.svg',
   // Para acrescentar detalhes (altura, número do pé), escreva direto na frase.
-  bio: 'Oi, eu sou a Maya ♡ Entra, fica à vontade e descobre meu lado mais reservado por aqui.',
+  bio: 'Oi, eu sou a Joice ♡ Entra, fica à vontade e descobre meu lado mais reservado por aqui.',
   /**
    * Números mostrados no perfil e nas abas.
    *   mídias  = photos + videos (calculado, não precisa escrever)
@@ -55,12 +55,6 @@ const posts = [
 
   { id: 4, type: 'video', source: 'Midias_Bloqueadas/a1a71c2a-69d3-4f82-95d1-406581ecdcdf (2).mp4',
     caption: 'esse aqui eu nunca postei em lugar nenhum', likes: 842, comments: 128 },
-
-  // Bloco de chamada no meio do feed. Não vende nada por enquanto.
-  { id: 5, type: 'cta', variant: 'whatsapp',
-    title: 'Ainda mais perto.',
-    text: 'O contato direto está chegando ao clube. Um novo jeito de ficar pertinho.',
-    button: 'Conhecer a novidade ↗' },
 
   { id: 6, type: 'video', source: 'Midias_Bloqueadas/c24b810d-b0cd-4cfc-b815-8600bdb79f93.mp4',
     caption: 'saindo do banho 💦', likes: 956, comments: 63 },
