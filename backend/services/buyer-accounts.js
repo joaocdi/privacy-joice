@@ -10,7 +10,7 @@ function cookie(req){return (req.headers.cookie||'').split(';').map(s=>s.trim())
 function origin(req){
   const expected=process.env.PUBLIC_APP_URL || (process.env.NODE_ENV!=='production'?req.protocol+'://'+req.get('host'):null);
   // O URL do deploy pode diferir do domínio público. Só origens explícitas são aceitas.
-  const allowed=new Set(['https://maya.ofc.bio']);
+  const allowed=new Set(['https://joice.ofc.bio']);
   if(expected)allowed.add(new URL(expected).origin);
   if(!allowed.has(req.get('origin')) || req.get('sec-fetch-site')==='cross-site') throw fail('Origem inválida.',403);
 }

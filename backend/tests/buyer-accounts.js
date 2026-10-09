@@ -35,7 +35,7 @@ const {app}=require('../server'),database=require('../db/database'),{confirmPaym
  const evil=await fetch(base+'/api/buyer/account/logout',{method:'POST',headers:{Origin:'https://evil.invalid','Content-Type':'application/json',Cookie:cookie},body:'{}'});assert.equal(evil.status,403);
  const configured=process.env.PUBLIC_APP_URL;
  process.env.PUBLIC_APP_URL='https://preview.example.test';
- const canonicalReq={get:name=>name==='origin'?'https://maya.ofc.bio':'same-origin'};
+ const canonicalReq={get:name=>name==='origin'?'https://joice.ofc.bio':'same-origin'};
  assert.doesNotThrow(()=>require('../services/buyer-accounts').origin(canonicalReq));
  assert.throws(()=>require('../services/buyer-accounts').origin({get:name=>name==='origin'?'https://evil.invalid':'cross-site'}),/Origem inválida/);
  process.env.PUBLIC_APP_URL=configured;

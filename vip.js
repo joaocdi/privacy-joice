@@ -420,7 +420,7 @@ function buildMediaPost(post, profile, priority = false) {
         try { image.src = await freshMediaUrl(post, item); }
         catch (_) { mediaUnavailable(cell, { draft: post.draft }); }
       });
-      image.alt = post.caption || 'Foto exclusiva da Maya';
+      image.alt = post.caption || 'Foto exclusiva da Joice';
       image.addEventListener('load', () => {
         cell.classList.toggle('is-landscape', image.naturalWidth > image.naturalHeight);
         if (Number(box.dataset.activeIndex || 0) === index) box.classList.toggle('is-landscape', image.naturalWidth > image.naturalHeight);
