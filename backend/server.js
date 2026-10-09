@@ -216,7 +216,7 @@ async function contactAccess(order) {
   if (!order || order.status !== 'PAID' || order.product_id !== 'whatsapp_unlock' || order.access_type !== 'whatsapp' || order.grant_type !== 'contact') return false;
   return Boolean(await (await getDb()).get("SELECT id FROM entitlements WHERE order_id=? AND product_id='whatsapp_unlock' AND grant_type='contact' AND status='ACTIVE' AND (expires_at IS NULL OR expires_at>CURRENT_TIMESTAMP)", order.id));
 }
-app.get('/api/contact', (req, res) => res.json({ whatsapp: null, available: Boolean(contactUrl()), price: products.whatsapp_unlock.price }));
+app.get('/api/contact', (req, res) => res.json({ whatsapp: null, available: Boolean(products.whatsapp_unlock.enabled && contactUrl()), price: products.whatsapp_unlock.price }));
 app.get('/api/contact/:orderId', authorizeOrder, async (req, res) => {
   try {
     if (!await contactAccess(req.order)) return res.status(403).json({ error: 'Contato ainda não liberado.' });

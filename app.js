@@ -590,9 +590,9 @@ async function openCheckout(productId, resumeToken = null) {
     document.getElementById('checkoutPlanLabel').textContent = product.name;
     document.getElementById('checkoutPlanPrice').textContent = product.price.toLocaleString('pt-BR', {style:'currency',currency:'BRL'});
     const offerDetails = {
-      monthly: '30 dias de acesso ao conteúdo VIP da Maya.',
-      quarterly: '90 dias de acesso ao conteúdo VIP da Maya.',
-      semester: '180 dias de acesso ao conteúdo VIP da Maya.',
+      monthly: '30 dias de acesso ao conteúdo VIP de ' + (perfilAtual?.name || 'Joice') + '.',
+      quarterly: '90 dias de acesso ao conteúdo VIP de ' + (perfilAtual?.name || 'Joice') + '.',
+      semester: '180 dias de acesso ao conteúdo VIP de ' + (perfilAtual?.name || 'Joice') + '.',
       whatsapp_unlock: 'Desbloqueio avulso do contato privado no WhatsApp. Não inclui acesso VIP nem garante resposta imediata.'
     };
     document.getElementById('checkoutOfferDetails').textContent = (offerDetails[selectedProduct] || product.name) + ' Valor total: ' + product.price.toLocaleString('pt-BR', {style:'currency',currency:'BRL'}) + '. Pagamento único via PIX, sem renovação automática e sem taxa adicional obrigatória.';
@@ -1093,19 +1093,6 @@ document.addEventListener('keydown', event => {
 document.querySelectorAll('[data-buyer-access]').forEach(link=>{link.href='/meu-acesso';});
 function openBuyerRecovery(){location.assign('/esqueci-senha');}
 if(new URLSearchParams(location.search).get('recover')==='1')openBuyerRecovery();
-else {
-  // A saved order is resumed only after an explicit choice, never on reload.
-  // Consume the VIP contact link so refreshing it cannot reopen checkout.
-  const url = new URL(location.href);
-  const buy = url.searchParams.get('buy');
-  if (buy === 'whatsapp_unlock') {
-    url.searchParams.delete('buy');
-    history.replaceState(history.state, '', url.pathname + url.search + url.hash);
-    if (performance.getEntriesByType('navigation')[0]?.type !== 'reload') {
-      window.ageReady.then(() => openCheckout(buy));
-    }
-  }
-}
 window.ageReady.then(async () => {
   await refreshPendingPixNotice();
   if (location.hash === '#pixNotificationBell' && !document.getElementById('pixNotificationBell').hidden) document.getElementById('pixNotificationBell').click();
@@ -1113,78 +1100,6 @@ window.ageReady.then(async () => {
 window.addEventListener('storage', event => { if (event.key?.startsWith(JoiceCheckouts.prefix)) refreshPendingPixNotice(); });
 window.addEventListener('focus', refreshPendingPixNotice);
 
-
-// Contato pago: usa o checkout existente e uma credencial separada do VIP.
-async function openPaidContact(access) {
-  const response = await fetch(API_BASE + '/api/contact/' + encodeURIComponent(access.orderId), {
-    signal: AbortSignal.timeout(15000)
-  });
-  const data = await response.json();
-  if (!response.ok || !data.whatsapp) throw new Error(data.error || 'Contato indisponível.');
-  const url = new URL(data.whatsapp);
-  if (url.protocol !== 'https:') throw new Error('Contato inválido.');
-  window.location.assign(url.href);
-}
-const contactChat = document.getElementById('contactChat');
-const contactFab = document.getElementById('contactFab');
-const contactTyping = document.getElementById('contactTyping');
-const contactWelcome = document.getElementById('contactWelcome');
-let contactWelcomeTimer;
-function closeContactChat() {
-  clearTimeout(contactWelcomeTimer);
-  contactTyping.hidden = true;
-  contactWelcome.hidden = true;
-  contactChat.hidden = true;
-  contactFab.setAttribute('aria-expanded', 'false');
-}
-contactFab.addEventListener('click', () => {
-  if (!contactChat.hidden) { closeContactChat(); return; }
-  contactChat.hidden = false;
-  contactFab.setAttribute('aria-expanded', 'true');
-  contactWelcome.hidden = true;
-  contactTyping.hidden = false;
-  clearTimeout(contactWelcomeTimer);
-  contactWelcomeTimer = setTimeout(() => {
-    if (contactChat.hidden) return;
-    contactTyping.hidden = true;
-    contactWelcome.hidden = false;
-  }, 4000);
-  document.getElementById('contactChatClose').focus();
-});
-document.getElementById('contactChatClose').addEventListener('click', () => { closeContactChat(); contactFab.focus(); });
-contactChat.addEventListener('keydown', e => { if (e.key === 'Escape') { closeContactChat(); contactFab.focus(); } });
-async function showContactUnlock() {
-  closeContactChat(); openModal('contactUnlockModal');
-  const button = document.getElementById('contactBuy');
-  const status = document.getElementById('contactUnlockStatus');
-  button.disabled = true; status.textContent = 'Consultando disponibilidade…';
-  try {
-    const response = await fetch(API_BASE + '/api/contact', { signal: AbortSignal.timeout(10000) });
-    if (!response.ok) throw new Error('Contato temporariamente indisponível.');
-    const data = await response.json();
-    const contactPrice = Number(data.price).toLocaleString('pt-BR', { style:'currency', currency:'BRL' });
-    const accountResponse = await fetch(API_BASE + '/api/buyer/account');
-    const account = accountResponse.ok ? await accountResponse.json() : null;
-    const owned = account?.orders?.find(o => o.grant_type === 'contact' && o.status === 'ACTIVE');
-    const access = owned ? {orderId: owned.public_id} : null;
-    const saved = Boolean(access);
-    button.textContent = saved ? 'Abrir meu WhatsApp' : 'DESBLOQUEAR POR ' + contactPrice;
-    button.disabled = !data.available;
-    status.textContent = data.available ? '' : 'Contato temporariamente indisponível. Nenhuma cobrança será gerada.';
-    button.onclick = async () => {
-      if (saved) {
-        button.disabled = true;
-        try { await openPaidContact(access); } catch (error) { status.textContent = error.message; button.disabled = false; }
-      } else { closeModal('contactUnlockModal'); openCheckout('whatsapp_unlock'); }
-    };
-  } catch (error) { status.textContent = error.message; }
-}
-document.getElementById('contactReply').addEventListener('submit', e => {
-  e.preventDefault();
-  e.currentTarget.querySelector('input').value = '';
-  showContactUnlock();
-});
-for (const id of ['contactUnlockClose','contactUnlockLater']) document.getElementById(id).addEventListener('click', () => closeModal('contactUnlockModal'));
 
 window.addEventListener('hashchange', async () => {
   await refreshPendingPixNotice();
